@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atrius Theme Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --panel-w: 392px;
+    --ink: #e9e6df;
+    --ink-2: #a19d94;
+    --ink-3: #6d6a64;
+    --bg: #141412;
+    --bg-2: #1b1b18;
+    --bg-3: #24241f;
+    --line: #2c2c27;
+    --accent: #ffb224;
+    --good: #5fc98a;
+    --warn: #f0b84a;
+    --bad: #f06a5a;
+    --ui: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+    --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    display: grid;
+    grid-template-columns: 1fr var(--panel-w);
+    background: var(--bg);
+    font-family: var(--ui);
+    color: var(--ink);
+    overflow: hidden;
+  }
+  body.collapsed { grid-template-columns: 1fr 0; }
+
+  /* ---------- map ---------- */
+  .stage { position: relative; min-width: 0; }
+  /* isolate: the SDK uses z-indexes up to ~20000 — keep them inside the map */
+  .mymap { position: absolute; inset: 0; isolation: isolate; z-index: 0; }
+  .stage-badge {
+    position: absolute; left: 12px; bottom: 12px; z-index: 5;
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px 6px 8px; border-radius: 999px;
+    background: rgba(20,20,18,.86); backdrop-filter: blur(6px);
+    font: 500 11px/1 var(--mono); color: var(--ink-2);
+    pointer-events: none;
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-3); }
+  .stage-badge[data-state="applying"] .dot { background: var(--accent); animation: pulse .8s ease-in-out infinite; }
+  .stage-badge[data-state="ok"] .dot { background: var(--good); }
+  .stage-badge[data-state="error"] .dot { background: var(--bad); }
+  @keyframes pulse { 50% { opacity: .3; } }
+  .toggle-panel {
+    position: absolute; top: 50%; right: 0; z-index: 6; transform: translateY(-50%);
+    width: 18px; height: 56px; border: 0; border-radius: 6px 0 0 6px;
+    background: var(--bg); color: var(--ink-2); cursor: pointer; font-size: 11px;
+  }
+  .toggle-panel:hover { color: var(--ink); }
+
+  /* ---------- panel ---------- */
+  .panel {
+    display: flex; flex-direction: column; min-width: 0; height: 100vh;
+    border-left: 1px solid var(--line); background: var(--bg);
+    overflow: hidden;
+  }
+  .head { padding: 18px 18px 12px; border-bottom: 1px solid var(--line); }
+  .title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  /* .panel prefix: the SDK injects a global normalize (h1 { font-size: 2em }) */
+  .panel h1 { margin: 0; font-size: 15px; line-height: 1.2; font-weight: 600; letter-spacing: -.01em; }
+  .panel h1 span { color: var(--ink-3); font-weight: 400; }
+  .count { font: 500 11px/1 var(--mono); color: var(--ink-3); white-space: nowrap; }
+  .count b { color: var(--accent); font-weight: 500; }
+
+  .controls {
+    display: grid; grid-template-columns: auto 1fr; grid-template-areas: "mode preset" "search search";
+    gap: 8px; margin-top: 14px;
+  }
+  #modeSeg { grid-area: mode; }
+  #preset { grid-area: preset; justify-self: end; }
+  #search { grid-area: search; }
+  .controls .seg { height: 32px; align-items: center; }
+  .controls .seg button { height: 26px; padding: 0 9px; }
+  .mode-note { margin-top: 8px; font-size: 11px; line-height: 1.45; color: var(--ink-3); }
+  /* hides the SDK menu while the studio clicks its hidden dark-mode item */
+  .ats-quiet [role=menu], .ats-quiet [role=menuitem] { opacity: 0 !important; }
+  .field, select, .btn {
+    height: 32px; border-radius: 7px; border: 1px solid var(--line);
+    background: var(--bg-2); color: var(--ink); font: 13px var(--ui);
+  }
+  .field { width: 100%; padding: 0 10px; outline: none; }
+  .field:focus, select:focus, .hex:focus { border-color: #4a4a42; box-shadow: 0 0 0 3px rgba(255,178,36,.12); }
+  .field::placeholder { color: var(--ink-3); }
+  select { padding: 0 28px 0 10px; appearance: none; cursor: pointer; outline: none;
+    background-image: linear-gradient(45deg, transparent 50%, var(--ink-2) 50%), linear-gradient(135deg, var(--ink-2) 50%, transparent 50%);
+    background-position: calc(100% - 15px) 14px, calc(100% - 10px) 14px; background-size: 5px 5px; background-repeat: no-repeat; }
+
+  .switch { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 12.5px; color: var(--ink); cursor: pointer; user-select: none; }
+  .switch input { margin: 0; width: 14px; height: 14px; accent-color: var(--accent); cursor: pointer; }
+  .switch em { margin-left: auto; font-style: normal; font-size: 11px; color: var(--ink-3); }
+  details.venue { margin-top: 10px; }
+  details.venue summary { list-style: none; cursor: pointer; font-size: 12px; color: var(--ink-3); user-select: none; }
+  details.venue summary::-webkit-details-marker { display: none; }
+  details.venue summary::before { content: '▸ '; }
+  details.venue[open] summary::before { content: '▾ '; }
+  .venue-grid { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; margin-top: 8px; }
+  .venue-grid label { font-size: 11px; color: var(--ink-3); display: grid; gap: 4px; }
+  .venue-grid .field { font-family: var(--mono); font-size: 12px; }
+  .venue-grid .btn { align-self: end; }
+
+  .list { flex: 1; overflow-y: auto; padding: 6px 0 24px; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+
+  .tier {
+    padding: 18px 18px 6px; font: 600 10px/1 var(--ui); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .tier::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+  .tier-note { padding: 0 18px 8px; font-size: 11.5px; line-height: 1.45; color: var(--ink-3); }
+
+  .group { border-bottom: 1px solid transparent; }
+  .group > summary {
+    list-style: none; cursor: pointer; user-select: none;
+    display: flex; align-items: center; gap: 10px; padding: 10px 18px;
+    font-size: 13px; font-weight: 500; color: var(--ink);
+  }
+  .group > summary::-webkit-details-marker { display: none; }
+  .group > summary:hover { background: var(--bg-2); }
+  .chev { width: 10px; color: var(--ink-3); font-size: 10px; transition: transform .15s ease; }
+  .group[open] .chev { transform: rotate(90deg); }
+  .strip { display: flex; margin-left: auto; }
+  .strip i { width: 12px; height: 12px; border-radius: 3px; margin-left: -3px; box-shadow: 0 0 0 1.5px var(--bg); }
+  .gmod { font: 500 10px/1 var(--mono); color: var(--accent); min-width: 14px; text-align: right; }
+
+  .row {
+    position: relative; display: grid; grid-template-columns: 30px 1fr 84px 38px 18px;
+    align-items: center; gap: 10px; padding: 5px 18px 5px 38px;
+  }
+  .row:hover { background: var(--bg-2); }
+  .row.mod::before { content: ''; position: absolute; left: 26px; top: 50%; width: 5px; height: 5px; margin-top: -2.5px; border-radius: 50%; background: var(--accent); }
+  .row[hidden] { display: none; }
+
+  .swatch {
+    position: relative; width: 30px; height: 30px; border-radius: 7px; overflow: hidden; cursor: pointer;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);
+    background-image: conic-gradient(#555 25%, #333 0 50%, #555 0 75%, #333 0); background-size: 8px 8px;
+  }
+  .swatch span { position: absolute; inset: 0; }
+  .swatch input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
+  .swatch.sm { width: 22px; height: 22px; border-radius: 6px; justify-self: center; }
+  .swatch.round { border-radius: 50%; }
+  .row.place { grid-template-columns: 30px 1fr 84px 22px 18px; }
+  .badge-toggle { margin: 4px 18px 8px; }
+  .key { font: 12px/1.25 var(--mono); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .key small { display: block; font: 10.5px/1.3 var(--ui); color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hex {
+    width: 100%; height: 28px; padding: 0 8px; border-radius: 6px; border: 1px solid transparent;
+    background: var(--bg-3); color: var(--ink); font: 12px var(--mono); text-transform: uppercase; outline: none;
+  }
+  .hex.invalid { border-color: var(--bad); }
+  .cr { font: 500 10px/1 var(--mono); text-align: center; padding: 4px 0; border-radius: 4px; cursor: help; }
+  .cr.aaa { color: var(--good); background: rgba(95,201,138,.1); }
+  .cr.aa { color: var(--warn); background: rgba(240,184,74,.1); }
+  .cr.fail { color: var(--bad); background: rgba(240,106,90,.12); }
+  .reset {
+    width: 18px; height: 18px; border: 0; padding: 0; background: none; color: var(--ink-3);
+    cursor: pointer; font-size: 13px; line-height: 1; visibility: hidden; border-radius: 4px;
+  }
+  .row.mod .reset { visibility: visible; }
+  .reset:hover { color: var(--ink); background: var(--bg-3); }
+
+  .empty { padding: 32px 18px; color: var(--ink-3); font-size: 13px; text-align: center; }
+
+  /* ---------- footer ---------- */
+  .foot {
+    display: grid; grid-template-columns: 1fr auto auto; gap: 8px; padding: 12px 18px;
+    border-top: 1px solid var(--line); background: var(--bg);
+  }
+  .btn { padding: 0 12px; cursor: pointer; font-weight: 500; white-space: nowrap; }
+  .btn:hover { background: var(--bg-3); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #1a1406; }
+  .btn.primary:hover { background: #ffc255; }
+  .btn:active { transform: translateY(1px); }
+  .btn:disabled { opacity: .45; cursor: default; transform: none; }
+  .btn.primary:disabled:hover { background: var(--accent); }
+  .apply-row { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; }
+  .apply-row .switch { margin-top: 0; flex: 1; }
+  .sheet-msg { padding: 18px 16px; font-size: 13px; line-height: 1.5; color: var(--ink-2); }
+
+  /* ---------- sheet (code / import) ---------- */
+  .sheet-wrap { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: rgba(0,0,0,.45); }
+  .sheet {
+    width: min(620px, calc(100vw - 32px)); max-height: calc(100vh - 64px); display: flex; flex-direction: column;
+    border: 1px solid var(--line); border-radius: 12px; background: var(--bg); box-shadow: 0 30px 80px rgba(0,0,0,.5);
+    animation: rise .18s cubic-bezier(.2,.8,.2,1);
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px) scale(.99); } }
+  .sheet header { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  .sheet header h2 { margin: 0; font-size: 14px; font-weight: 600; flex: 1; }
+  .seg { display: inline-flex; padding: 2px; border-radius: 7px; background: var(--bg-2); border: 1px solid var(--line); }
+  .seg button { height: 24px; padding: 0 10px; border: 0; border-radius: 5px; background: none; color: var(--ink-2); font: 500 12px var(--ui); cursor: pointer; }
+  .seg button.on { background: var(--bg-3); color: var(--ink); }
+  .sheet pre, .sheet textarea {
+    margin: 0; padding: 16px; flex: 1; overflow: auto; min-height: 260px;
+    font: 12px/1.6 var(--mono); color: var(--ink); background: var(--bg-2); border: 0; outline: none; resize: none; white-space: pre;
+  }
+  .sheet footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line); }
+  .sheet .hint { margin-right: auto; align-self: center; font-size: 12px; color: var(--ink-3); }
+  .toast {
+    position: fixed; right: calc(var(--panel-w) + 16px); bottom: 16px; z-index: 30;
+    max-width: 360px; line-height: 1.4;
+    padding: 8px 12px; border-radius: 8px; background: var(--ink); color: var(--bg); font-size: 12.5px; font-weight: 500;
+    animation: rise .18s ease;
+  }
+</style>
+</head>
+<body>
+  <main class="stage">
+    <div class="mymap"></div>
+    <div class="stage-badge" id="status" data-state="idle"><span class="dot"></span><span id="statusText">Loading SDK…</span></div>
+    <button class="toggle-panel" id="togglePanel" title="Hide / show panel">▸</button>
+  </main>
+
+  <aside class="panel">
+    <div class="head">
+      <div class="title-row">
+        <h1>Theme Studio <span>· Atrius Maps</span></h1>
+        <div class="count" id="count"></div>
+      </div>
+      <div class="controls">
+        <div class="seg" id="modeSeg" role="group" aria-label="Color mode">
+          <button data-mode="light">☀ Light</button><button data-mode="dark">☾ Dark</button>
+        </div>
+        <input class="field" id="search" type="search" placeholder="Filter keys…" autocomplete="off">
+        <select id="preset" title="Load a preset">
+          <option value="">Presets</option>
+          <option value="sdk">SDK defaults</option>
+          <option value="docs">Docs sample (purple)</option>
+          <option value="united">United map mockup (approx.)</option>
+        </select>
+      </div>
+      <div class="mode-note" id="modeNote" hidden>Dark mode: editing a separate dark palette (a studio starting point — Atrius publishes none for web). The dark map comes from the venue’s own dark colors via an undocumented SDK toggle.</div>
+      <label class="switch" title="Adds plugins.flightStatus and a Flight Status shortcut under the search bar">
+        <input type="checkbox" id="flightToggle"><span>Flight Status button</span><em>flight data needs the Atrius add-on</em>
+      </label>
+      <details class="venue">
+        <summary>Venue & account</summary>
+        <div class="venue-grid">
+          <label>venueId <input class="field" id="venueId" list="venues" spellcheck="false"></label>
+          <datalist id="venues"><option>lax</option><option>sea</option><option>gru</option><option>grupo</option><option>grusp</option><option>stn</option></datalist>
+          <label>accountId <input class="field" id="accountId" spellcheck="false"></label>
+          <button class="btn" id="venueApply">Load</button>
+        </div>
+      </details>
+    </div>
+
+    <div class="list" id="list"></div>
+
+    <div class="foot">
+      <div class="apply-row">
+        <label class="switch"><input type="checkbox" id="autoApply"><span>Apply changes automatically</span></label>
+        <button class="btn primary" id="applyBtn" disabled>Applied</button>
+      </div>
+      <button class="btn" id="openCode">Export config</button>
+      <button class="btn" id="openImport">Import</button>
+      <button class="btn" id="resetAll" title="Reset the current palette and this venue's map colors">Reset all</button>
+    </div>
+  </aside>
+
+<script type="module">
+import LMInit from 'https://maps.locuslabs.com/sdk/LocusMapsSDK.js'
+
+/* ------------------------------------------------------------------
+   Theme keys
+   DOCUMENTED = the 31 keys listed at docs.atrius.com/docs/theming-1
+   EXTENDED   = additional keys read from the SDK's built-in default
+                theme (ThemeManager module). Undocumented — may change.
+   Defaults are the SDK's actual runtime defaults (not the purple values
+   shown in the docs' example list).
+------------------------------------------------------------------- */
+const GROUPS = [
+  { tier: 'documented', name: 'Primary', keys: {
+    primary: ['#2266DD', 'Accent: links, selected states, icons'],
+    primaryButton: ['#124CB1', 'Main call-to-action buttons'],
+    primaryButtonText: ['#FFFFFF', 'Label on primary buttons', 'primaryButton'],
+    primaryButtonHover: ['#0B3B8E', 'Primary button hover'],
+  }},
+  { tier: 'documented', name: 'Secondary', keys: {
+    secondary: ['#333333', 'Secondary accent'],
+    secondaryButton: ['#EBEBEB', 'Secondary buttons'],
+    secondaryButtonText: ['#124CB1', 'Label on secondary buttons', 'secondaryButton'],
+    secondaryButtonHover: ['#D9D9D9', 'Secondary button hover'],
+  }},
+  { tier: 'documented', name: 'Text & surface', keys: {
+    primaryText: ['#333333', 'Main body text', 'background'],
+    secondaryText: ['#666666', 'Supporting / meta text', 'background'],
+    background: ['#FFFFFF', 'Panels and sheets'],
+    errorState: ['#E52727', 'Errors and validation'],
+  }},
+  { tier: 'documented', name: 'Tooltip', keys: {
+    toolTipBackground: ['#000000', 'Tooltip fill'],
+    toolTipText: ['#FFFFFF', 'Tooltip label', 'toolTipBackground'],
+  }},
+  { tier: 'documented', name: 'Map navigation', keys: {
+    mapNavBackground: ['#333333', 'Directions / nav header'],
+    mapNavText: ['#FFFFFF', 'Nav header text', 'mapNavBackground'],
+    mapNavSearchResults: ['#9D3800', 'Search-result pins on map'],
+    mapNavSearchResultsText: ['#FFFFFF', 'Search-result pin label', 'mapNavSearchResults'],
+  }},
+  { tier: 'documented', name: 'Widgets', keys: {
+    widgetBackground: ['#F9F9F9', 'Search bar, floor picker, controls'],
+    widgetIconFill: ['#333333', 'Widget icons'],
+    widgetText: ['#333333', 'Widget text', 'widgetBackground'],
+  }},
+  { tier: 'documented', name: 'Flight status', keys: {
+    statusOpenBackground: ['#1F8845', 'Open / on time'],
+    statusOpenText: ['#FFFFFF', '', 'statusOpenBackground'],
+    statusClosedBackground: ['#EBEBEB', 'Closed'],
+    statusClosedText: ['#333333', '', 'statusClosedBackground'],
+    statusEarlyBackground: ['#057DBC', 'Early'],
+    statusEarlyText: ['#FFFFFF', '', 'statusEarlyBackground'],
+    statusDelayedBackground: ['#CA4800', 'Delayed'],
+    statusDelayedText: ['#FFFFFF', '', 'statusDelayedBackground'],
+    statusCancelledBackground: ['#E52727', 'Cancelled'],
+    statusCancelledText: ['#FFFFFF', '', 'statusCancelledBackground'],
+  }},
+
+  { tier: 'extended', name: 'Destructive, overlay & focus', keys: {
+    destructiveButton: ['#B00000', ''],
+    destructiveButtonHover: ['#8C0000', ''],
+    destructiveButtonText: ['#FFFFFF', '', 'destructiveButton'],
+    destructiveButtonHoverText: ['#FFFFFF', '', 'destructiveButtonHover'],
+    overlay: ['#000000', 'Scrim behind modals'],
+    focusOutlineColor: ['#C76D00', 'Keyboard focus ring'],
+    widgetIcons: ['#333333', ''],
+    modHeaderBackground: ['#2266DD', 'Module header'],
+    modHeaderText: ['#FFFFFF', '', 'modHeaderBackground'],
+  }},
+  { tier: 'extended', name: 'My location', keys: {
+    myLocationPrimaryButton: ['#2266DD', ''],
+    myLocationPrimaryButtonHover: ['#124CB1', ''],
+    myLocationSecondaryButton: ['#666666', ''],
+    myLocationSecondaryButtonHover: ['#333333', ''],
+  }},
+  { tier: 'extended', name: 'System status', keys: {
+    statusAlertBackground: ['#B00000', ''], statusAlertText: ['#FFFFFF', '', 'statusAlertBackground'],
+    statusActiveBackground: ['#00662B', ''], statusActiveText: ['#FFFFFF', '', 'statusActiveBackground'],
+    statusInfoBackground: ['#005B94', ''], statusInfoText: ['#FFFFFF', '', 'statusInfoBackground'],
+    statusWarningBackground: ['#9D3800', ''], statusWarningText: ['#FFFFFF', '', 'statusWarningBackground'],
+    statusInactiveBackground: ['#EBEBEB', ''], statusInactiveText: ['#333333', '', 'statusInactiveBackground'],
+    statusSuccessBackground: ['#00662B', ''], statusSuccessText: ['#FFFFFF', '', 'statusSuccessBackground'],
+    statusErrorBackground: ['#B00000', ''], statusErrorText: ['#FFFFFF', '', 'statusErrorBackground'],
+  }},
+  { tier: 'extended', name: 'Markers & pins', keys: {
+    adminMarkerText: ['#4D4563', ''], adminMarkerStroke: ['#FFFFFF', ''],
+    programmaticPinMarkersText: ['#4D4563', ''], programmaticPinMarkersStroke: ['#FFFFFF', ''],
+    miscBadgeIconColor: ['#FFFFFF', ''], miscBadgeIconStroke: ['#FFFFFF', ''],
+    miscBadgeDynamicLabelColor: ['#596FA3', ''], miscBadgeDynamicLabelStroke: ['#FFFFFF', ''],
+    miscBadgePinColor: ['#215FEB', ''], miscBadgePinStroke: ['#18419C', ''],
+    miscSelectedbgColor: ['#FFFFFF', ''], miscSelectedbgStroke: ['#C7C5CC', ''],
+    miscWayfindingStartColor: ['#404A59', ''], miscWayfindingStartStroke: ['#000000', ''],
+    miscWayfindingStartGhostColor: ['#C1C1C1', ''], miscWayfindingStartGhostStroke: ['#404A59', ''],
+  }},
+  { tier: 'extended', name: 'Category badges', keys: Object.fromEntries(Object.entries({
+    Art: '#525466', Baggage: '#525466', Checkin: '#525466', Convention: '#60C28F', Eat: '#58C173',
+    Entertainment: '#A386DB', Equipment: '#525466', Exit: '#2AA74B', Gambling: '#A386DB', Gate: '#596FA3',
+    Inactive: '#909090', Hotel: '#525466', Meeting: '#60C28F', Office: '#6C87BB', Parking: '#525466',
+    Portal: '#525466', Recreation: '#A386DB', Relax: '#A386DB', Restroom: '#FF9F48', Room: '#5C8BE0',
+    Security: '#DC4747', Services: '#525466', Shop: '#59A6ED', Ticketing: '#525466', Transport: '#525466',
+    Wayfinding: '#E2611A', Workstation: '#85B0E2',
+  // Per Atrius's badge guide: parent-category badge colors, shared by subcategories. The web SDK
+  // doesn't apply them to its own icons, so the studio previews them (see "category badge preview").
+  }).map(([k, v]) => ['categoryBadge' + k, [v, 'Badge · map badges, list & POI icons']])) },
+]
+
+// The "List of all keys" block from the docs page — useful as a sanity preset.
+const DOCS_SAMPLE = {
+  primary: '#522981', primaryButton: '#8559A6', primaryButtonText: '#FFFFFF', primaryButtonHover: '#722FA5',
+  secondary: '#999999', secondaryButton: '#EEEEEE', secondaryButtonText: '#8559A6', secondaryButtonHover: '#D9D9D9',
+  errorState: '#E52727', primaryText: '#333333', secondaryText: '#666666', background: '#FFFFFF',
+  toolTipBackground: '#000000', toolTipText: '#FFFFFF', mapNavBackground: '#522981', mapNavText: '#FFFFFF',
+  mapNavSearchResults: '#9F147B', mapNavSearchResultsText: '#FFFFFF', widgetBackground: '#F9F9F9',
+  widgetIconFill: '#522981', widgetText: '#522981', statusOpenBackground: '#219653', statusOpenText: '#FFFFFF',
+  statusClosedBackground: '#EBEBEB', statusClosedText: '#333333', statusEarlyBackground: '#0088DD',
+  statusEarlyText: '#FFFFFF', statusDelayedBackground: '#CA4800', statusDelayedText: '#FFFFFF',
+  statusCancelledBackground: '#E52727', statusCancelledText: '#FFFFFF',
+}
+
+const DEFAULTS = {}, META = {}
+for (const g of GROUPS) for (const [k, [def, desc, pair]] of Object.entries(g.keys)) {
+  DEFAULTS[k] = def; META[k] = { desc, pair, tier: g.tier }
+}
+
+/* ---------------- state ---------------- */
+const STORE = 'atrius-theme-studio-v1'
+const state = { overrides: {}, venueId: 'lax', accountId: 'A11F4Y6SZRXH4X', flightStatus: true, placeColors: {}, autoApply: false, badgePreview: true }
+
+// Setting poiCategories replaces the SDK's default shortcuts, so keep those and prepend Flight Status.
+const FLIGHT_CATEGORIES = [
+  { name: 'Flight Status', category: 'gate.departures' },
+  { name: 'Restaurants', category: 'eat' },
+  { name: 'Shop', category: 'shop' },
+  { name: 'Relax', category: 'relax' },
+  { name: 'Restroom', category: 'restroom' },
+  { name: 'Airlines', category: 'checkin' },
+]
+// Studio starting point for dark-mode UI colors (Atrius publishes no web dark palette).
+const DARK_DEFAULTS = { ...DEFAULTS,
+  primary: '#5B9BFF', primaryButton: '#2F6FE4', primaryButtonText: '#FFFFFF', primaryButtonHover: '#255BC0',
+  secondary: '#C8CBD2', secondaryButton: '#2E3138', secondaryButtonText: '#8DB6FF', secondaryButtonHover: '#3A3E47',
+  primaryText: '#F1F2F4', secondaryText: '#A7ABB4', background: '#1C1E23', errorState: '#FF6B6B',
+  toolTipBackground: '#F1F2F4', toolTipText: '#1C1E23',
+  mapNavBackground: '#2A2D34', mapNavText: '#FFFFFF', mapNavSearchResults: '#B5560F', mapNavSearchResultsText: '#FFFFFF',
+  widgetBackground: '#25282E', widgetIconFill: '#E6E8EC', widgetText: '#E6E8EC', widgetIcons: '#E6E8EC',
+  statusClosedBackground: '#3A3E47', statusClosedText: '#E6E8EC',
+  statusInactiveBackground: '#3A3E47', statusInactiveText: '#E6E8EC',
+  focusOutlineColor: '#FFB224', modHeaderBackground: '#2A2D34',
+}
+
+try { Object.assign(state, JSON.parse(localStorage.getItem(STORE)) || {}) } catch {}
+// Earlier versions stored one flat palette; keep it as the light palette.
+state.palettes ??= { light: state.overrides || {}, dark: {} }
+state.mode = state.mode === 'dark' ? 'dark' : 'light'
+state.overrides = state.palettes[state.mode] // the palette currently being edited
+const save = () => { try { localStorage.setItem(STORE, JSON.stringify({ ...state, overrides: undefined })) } catch {} }
+const def = k => (state.mode === 'dark' ? DARK_DEFAULTS : DEFAULTS)[k]
+const value = k => state.overrides[k] ?? def(k)
+
+/* ---------------- map place colors (venue theme.json) ----------------
+   Shape colors per place category come from Atrius's per-venue theme.json, not
+   theme.colors. For preview, the undocumented `dataFetch` config lets us hand the
+   SDK the account manifest with files.theme pointing at an edited copy. */
+const PLACE_GROUPS = [
+  ['Places', [
+    ['eat', 'Food & drink'], ['shop', 'Shopping'], ['relax', 'Lounges & relax'], ['restroom', 'Restrooms'],
+    ['services', 'Services'], ['gate', 'Gates'], ['security', 'Security'], ['checkin', 'Check-in'],
+    ['ticketing', 'Ticketing'], ['baggage', 'Baggage'], ['transport', 'Transport'], ['parking', 'Parking'],
+    ['art', 'Art'], ['hotel', 'Hotels'],
+  ]],
+  ['Base map', [
+    ['basemap.venue', 'Background / tarmac'], ['basemap.outdoor', 'Outdoor areas'], ['basemap.runway', 'Runways'],
+    ['basemap.road', 'Roads'], ['basemap.curb', 'Curbs'], ['basemap.jetway', 'Jetways'],
+    ['basemap.transitline', 'Transit lines'], ['element.building', 'Buildings / concourse'],
+    ['element.presecurity', 'Floor · pre-security'], ['element.postsecurity', 'Floor · post-security'],
+    ['element.wall', 'Walls'], ['element.opentobelow', 'Open to below'], ['element.nonaccessible', 'Non-accessible'],
+  ]],
+  ['Surfaces & labels', [
+    ['section', 'Terminal sections'], ['inactive', 'Inactive / closed'], ['unoccupied', 'Unoccupied'],
+    ['label', 'Map labels'], ['dynamicLabel', 'Dynamic labels'],
+  ]],
+]
+
+// Approximated from the "Using only the United colors" map mockup — a starting point to refine.
+const OTHER = ['#C6C8DE', '#A3A6C6']
+const UNITED_MAP = {
+  places: {
+    'basemap.venue': ['#4B4F95', '#4B4F95'], 'basemap.outdoor': ['#4B4F95', '#4B4F95'],
+    'basemap.runway': ['#434889', '#434889'], 'basemap.road': ['#0B1A6B', '#0B1A6B'],
+    'basemap.curb': ['#5A5FA3', '#5A5FA3'], 'basemap.jetway': ['#8A8FC0', '#6E73AC'],
+    'element.building': ['#8A8FC0', '#6E73AC'], 'element.presecurity': ['#9EA3D1', '#6E73AC'],
+    'element.postsecurity': ['#9EA3D1', '#6E73AC'], 'element.wall': ['#7A7FB8', '#7A7FB8'],
+    eat: ['#E3ECFB', '#B9C8EE'], shop: ['#EAE6F7', '#C9C0EC'],
+    restroom: OTHER, services: OTHER, relax: OTHER, gate: OTHER, security: OTHER, checkin: OTHER,
+    ticketing: OTHER, baggage: OTHER, transport: OTHER, art: OTHER,
+  },
+  badges: {
+    categoryBadgeEat: '#2F6BF2', categoryBadgeShop: '#6B5CE7', categoryBadgeRestroom: '#0E1452', categoryBadgeGate: '#1F18D4',
+    categoryBadgeServices: '#8A8A8A', categoryBadgeRelax: '#8A8A8A', categoryBadgeSecurity: '#8A8A8A', categoryBadgeCheckin: '#8A8A8A',
+    categoryBadgeTicketing: '#8A8A8A', categoryBadgeBaggage: '#8A8A8A', categoryBadgeTransport: '#8A8A8A',
+    categoryBadgeParking: '#8A8A8A', categoryBadgeArt: '#8A8A8A',
+  },
+}
+const FAMILY_KEYS = new Set(PLACE_GROUPS.flatMap(([, fams]) => fams.map(([k]) => k)))
+// Fill only: the venue style draws place shapes from fillColor and gives every polygon
+// a fixed black edge — strokeColor only reaches portal and parking-stall lines.
+const ALL_PLACE_ATTRS = ['fillColor', 'darkFillColor']
+const placeAttrs = () => state.mode === 'dark' ? ['darkFillColor'] : ['fillColor']
+const placeKey = () => `${state.accountId}/${state.venueId}`
+const placeEdits = () => (state.placeColors[placeKey()] ||= {})
+// Drop outline edits saved by earlier versions so they don't show up in exports.
+for (const venueEdits of Object.values(state.placeColors || {})) {
+  for (const [fam, attrs] of Object.entries(venueEdits)) {
+    delete attrs.strokeColor; delete attrs.darkStrokeColor
+    if (!Object.keys(attrs).length) delete venueEdits[fam]
+  }
+}
+
+let venue = null // { key, manifest, theme } for the venue shown in the panel
+const venueLoads = {}
+function loadVenueTheme () {
+  const key = placeKey(), { accountId, venueId } = state
+  if (!venueLoads[key]) {
+    venueLoads[key] = (async () => {
+      const manifest = await fetch(`https://a.locuslabs.com/accounts/${accountId}/v5.json`).then(r => r.json())
+      if (!manifest[venueId]) throw new Error(`Attempt to access venue ${venueId} which is not within venue list: ${Object.keys(manifest)}`)
+      const theme = await fetch(manifest[venueId].files.theme).then(r => r.json())
+      return { key, manifest, theme }
+    })()
+    venueLoads[key].catch(() => delete venueLoads[key])
+  }
+  return venueLoads[key]
+}
+
+// Venue default for an attribute; a missing dark* value falls back to its light one.
+const origPlace = (fam, attr) => {
+  const e = venue?.theme[fam] || {}
+  return normHex(e[attr] || '') || normHex(e[attr.replace(/^dark(\w)/, (_, c) => c.toLowerCase())] || '') || '#000000'
+}
+const placeValue = (fam, attr) => placeEdits()[fam]?.[attr] ?? origPlace(fam, attr)
+
+// Apply edits to a copy of theme.json: the category itself plus every subcategory
+// (e.g. eat.coffee) that still shares the parent's original color.
+function buildVenueTheme (theme, edits) {
+  const out = structuredClone(theme)
+  for (const [fam, attrs] of Object.entries(edits)) {
+    const parent = theme[fam]
+    if (!parent) continue
+    for (const k of Object.keys(theme)) {
+      if (k !== fam && !k.startsWith(fam + '.')) continue
+      for (const [attr, val] of Object.entries(attrs)) {
+        if (k === fam || theme[k][attr] === parent[attr]) out[k][attr] = val
+      }
+    }
+  }
+  return out
+}
+
+let themeBlobUrl = null
+globalThis.__atsVenueFiles = {
+  getFiles: async () => {
+    const v = await loadVenueTheme()
+    const manifest = structuredClone(v.manifest)
+    const url = URL.createObjectURL(new Blob([JSON.stringify(buildVenueTheme(v.theme, placeEdits()))], { type: 'application/json' }))
+    if (themeBlobUrl) setTimeout(URL.revokeObjectURL, 30000, themeBlobUrl)
+    themeBlobUrl = url
+    manifest[state.venueId].files.theme = url
+    return manifest
+  },
+}
+
+const placeRows = {}
+async function renderPlaces () {
+  const host = document.getElementById('placeSection')
+  if (!host) return
+  for (const k in placeRows) delete placeRows[k]
+  host.innerHTML = `<div class="tier" id="placeTier">Map place colors · venue file</div>
+    <div class="tier-note">Per category: shape fill (from Atrius’s map file for this venue) and badge color (its categoryBadge key — per Atrius’s badge guide, subcategories share the parent’s badge color). Preview only — export and send to Atrius to apply.</div>
+    <label class="switch badge-toggle"><input type="checkbox" id="badgePreview"><span>Preview badge colors</span><em>map badges · list &amp; POI icons</em></label>`
+  const bp = host.querySelector('#badgePreview')
+  bp.checked = state.badgePreview !== false
+  bp.addEventListener('change', () => { state.badgePreview = bp.checked; save(); applyBadgePreview() })
+  let v
+  try { v = await loadVenueTheme() } catch (e) {
+    host.insertAdjacentHTML('beforeend', `<div class="tier-note">Couldn’t load the venue file: ${e.message}</div>`)
+    return
+  }
+  if (v.key !== placeKey()) return // venue changed while loading
+  venue = v
+  for (const [name, fams] of PLACE_GROUPS) {
+    const det = document.createElement('details')
+    det.className = 'group'
+    det.dataset.group = name
+    det.open = name === 'Places'
+    det.innerHTML = '<summary><span class="chev">▶</span><span>' + name + '</span><span class="strip"></span><span class="gmod"></span></summary>'
+    for (const [fam, label] of fams) if (v.theme[fam]?.fillColor) det.append(buildPlaceRow(fam, label))
+    host.append(det)
+  }
+  syncPlaces(); syncChrome()
+  document.getElementById('search').dispatchEvent(new Event('input'))
+}
+
+function buildPlaceRow (fam, label) {
+  const subs = Object.keys(venue.theme).filter(k => k.startsWith(fam + '.')).length
+  const badgeKey = badgeKeyFor(fam)
+  const hasBadge = badgeKey in DEFAULTS
+  const row = document.createElement('div')
+  row.className = 'row place'
+  row.dataset.place = fam
+  row.dataset.search = `${fam} ${label} map place${hasBadge ? ' badge ' + badgeKey : ''}`.toLowerCase()
+  row.innerHTML = `
+    <label class="swatch" title="Fill"><span></span><input type="color"></label>
+    <div class="key" title="${fam}">${label}<small>${fam}${subs ? ` · +${subs} sub` : ''} · fill${hasBadge ? ' / badge' : ''}</small></div>
+    <input class="hex" spellcheck="false" maxlength="9" title="Fill">
+    ${hasBadge ? `<label class="swatch sm round" title="Badge color (${badgeKey})"><span></span><input type="color"></label>` : '<span></span>'}
+    <button class="reset" title="Reset to default">↺</button>`
+  const [fillPick, badgePick = null] = row.querySelectorAll('input[type=color]')
+  const [fillChip, badgeChip = null] = row.querySelectorAll('.swatch span')
+  badgePick?.addEventListener('input', () => setKey(badgeKey, badgePick.value))
+  const hex = row.querySelector('.hex')
+  fillPick.addEventListener('input', () => setPlace(fam, 0, fillPick.value))
+  hex.addEventListener('input', () => {
+    const n = normHex(hex.value)
+    hex.classList.toggle('invalid', !n && hex.value.trim() !== '')
+    if (n) setPlace(fam, 0, n, true)
+  })
+  hex.addEventListener('blur', () => { hex.classList.remove('invalid'); syncPlaceRow(fam) })
+  hex.addEventListener('keydown', e => { if (e.key === 'Enter') hex.blur() })
+  row.querySelector('.reset').addEventListener('click', () => {
+    for (const a of placeAttrs()) setPlaceRaw(fam, a, null)
+    if (hasBadge && badgeKey in state.overrides) setKey(badgeKey, null)
+    syncPlaceRow(fam); syncChrome(); save(); scheduleApply()
+  })
+  placeRows[fam] = { row, fillPick, fillChip, hex, badgePick, badgeChip, badgeKey: hasBadge ? badgeKey : null }
+  return row
+}
+
+function setPlaceRaw (fam, attr, v) {
+  const n = v == null ? null : normHex(v)
+  const e = placeEdits()[fam] ||= {}
+  if (!n || n === origPlace(fam, attr)) delete e[attr]
+  else e[attr] = n
+  if (!Object.keys(e).length) delete placeEdits()[fam]
+}
+
+function setPlace (fam, idx, v, fromHex = false) {
+  setPlaceRaw(fam, placeAttrs()[idx], v)
+  syncPlaceRow(fam, fromHex); syncChrome(); save(); scheduleApply()
+}
+
+function syncPlaceRow (fam, skipHex = false) {
+  const r = placeRows[fam]
+  if (!r) return
+  const [fa] = placeAttrs()
+  const f = placeValue(fam, fa)
+  r.fillChip.style.background = f; r.fillPick.value = f.slice(0, 7).toLowerCase()
+  if (!skipHex) r.hex.value = f
+  if (r.badgeKey) {
+    const b = value(r.badgeKey)
+    r.badgeChip.style.background = b; r.badgePick.value = b.slice(0, 7).toLowerCase()
+  }
+  const e = placeEdits()[fam]
+  r.row.classList.toggle('mod', (!!e && placeAttrs().some(a => a in e)) || (!!r.badgeKey && r.badgeKey in state.overrides))
+}
+
+function syncPlaces () { for (const fam in placeRows) syncPlaceRow(fam); syncPlaceChrome() }
+
+function syncPlaceChrome () {
+  const tier = document.getElementById('placeTier')
+  if (tier) tier.textContent = `Map place colors · venue file${state.mode === 'dark' ? ' · dark' : ''}`
+  for (const det of document.querySelectorAll('#placeSection .group')) {
+    const fams = [...det.querySelectorAll('.row')].map(r => r.dataset.place)
+    det.querySelector('.strip').innerHTML = fams.slice(0, 6).map(f => `<i style="background:${placeValue(f, placeAttrs()[0])}"></i>`).join('')
+    const m = fams.filter(f => { const e = placeEdits()[f]; return e && placeAttrs().some(a => a in e) }).length
+    det.querySelector('.gmod').textContent = m || ''
+  }
+}
+
+function mapExport (scope) {
+  if (!venue) return { text: '// Venue map file not loaded yet.', json: '{}', file: 'map-colors.json' }
+  const edited = buildVenueTheme(venue.theme, placeEdits())
+  let out = edited
+  if (scope !== 'all') {
+    out = {}
+    for (const [k, b] of Object.entries(edited)) {
+      const a = venue.theme[k]
+      if (!a || typeof a !== 'object') continue
+      for (const attr in b) if (b[attr] !== a[attr]) (out[k] ||= {})[attr] = b[attr]
+    }
+  }
+  const json = JSON.stringify(out, null, 2)
+  const header = scope === 'all'
+    ? `// Full venue map theme (theme.json) for ${state.venueId}, with your edits\n`
+    : `// Changed map place colors for ${state.venueId} — theme.json entries → attributes\n`
+  return {
+    text: Object.keys(out).length ? header + json : '// No map place color changes yet.',
+    json,
+    file: scope === 'all' ? `theme-${state.venueId}-edited.json` : `map-colors-${state.venueId}-changes.json`,
+  }
+}
+
+/* ---------------- category badge preview ----------------
+   Per Atrius's badge guide, each parent category has a badge color (the
+   categoryBadge* keys) that its subcategories share (eat → eat.bar, eat.coffee…).
+   The web SDK doesn't apply these to its own icons, so the studio previews them:
+   map badges are recolored in the map's image sprite (window._map, which the SDK
+   exposes when `debug` is set) and list / POI-window / menu icons in their inline SVGs. */
+let appliedBadges = {} // categoryBadge key → color, as of the last apply
+const badgeCat = key => key.slice('categoryBadge'.length).toLowerCase()
+const badgeKeyFor = name => { const top = name.split('.')[0]; return 'categoryBadge' + top.charAt(0).toUpperCase() + top.slice(1) }
+const snapshotBadges = () => {
+  appliedBadges = Object.fromEntries(Object.keys(DEFAULTS).filter(k => k.startsWith('categoryBadge')).map(k => [k, value(k)]))
+}
+
+// Most common opaque, non-white pixel = the badge's background color.
+function dominantColor (d) {
+  const counts = new Map()
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] < 250 || (d[i] > 235 && d[i + 1] > 235 && d[i + 2] > 235)) continue
+    const k = (d[i] << 16) | (d[i + 1] << 8) | d[i + 2]
+    counts.set(k, (counts.get(k) || 0) + 1)
+  }
+  let best = 0, key = 0
+  for (const [k, n] of counts) if (n > best) { best = n; key = k }
+  return [key >> 16 & 255, key >> 8 & 255, key & 255]
+}
+
+// Swap the background color for `hex`, keeping the white glyph and anti-aliasing:
+// each pixel is placed on the background→white line and re-mixed with the new color.
+function recolorPixels (src, hex) {
+  const B = dominantColor(src)
+  const N = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16))
+  const out = new Uint8Array(src.length)
+  for (let i = 0; i < src.length; i += 4) {
+    let num = 0, den = 0
+    for (let c = 0; c < 3; c++) { const w = 255 - B[c]; num += (src[i + c] - B[c]) * w; den += w * w }
+    const t = den ? Math.max(0, Math.min(1, num / den)) : 0
+    for (let c = 0; c < 3; c++) out[i + c] = Math.round(N[c] + t * (255 - N[c]))
+    out[i + 3] = src[i + 3]
+  }
+  return out
+}
+
+const spriteOrig = new Map(), spriteWritten = new Map()
+const sameBytes = (a, b) => a.length === b.length && a.every((v, i) => v === b[i])
+
+function applyMapBadges () {
+  const m = window._map
+  if (!m?.listImages || !m.style?.getImage) return false
+  const ids = m.listImages()
+  if (!ids.includes('eat') && !ids.includes('restroom')) return false // sprite not loaded yet
+  const on = state.badgePreview !== false
+  for (const id of ids) {
+    const key = badgeKeyFor(id)
+    const want = on && key in appliedBadges ? appliedBadges[key] : null
+    if (!want && !spriteWritten.has(id)) continue
+    const d = m.style.getImage(id)?.data
+    if (!d) continue
+    // Reuse the saved original if the image still holds what we last wrote; otherwise
+    // the map reloaded its sprite, so capture the fresh original.
+    let orig
+    if (spriteWritten.has(id) && sameBytes(d.data, spriteWritten.get(id))) orig = spriteOrig.get(id)
+    else { orig = new Uint8Array(d.data); spriteOrig.set(id, orig) }
+    const out = want ? recolorPixels(orig, want) : orig
+    m.updateImage(id, { width: d.width, height: d.height, data: out })
+    if (want) spriteWritten.set(id, new Uint8Array(out))
+    else { spriteWritten.delete(id); spriteOrig.delete(id) }
+  }
+  return true
+}
+
+function recolorUiBadges () {
+  const on = state.badgePreview !== false
+  for (const svg of document.querySelectorAll('.mymap svg[data-src*="/web-engine-ui/"]')) {
+    const key = badgeKeyFor(svg.getAttribute('data-src').split('/').pop().replace(/\.svg$/, ''))
+    if (!(key in appliedBadges)) continue
+    const circle = [...svg.querySelectorAll('path[fill]')].find(p => !/^(white|#fff|#ffffff)$/i.test(p.getAttribute('fill')))
+    if (!circle) continue
+    if (!circle.dataset.atsFill) circle.dataset.atsFill = circle.getAttribute('fill')
+    circle.setAttribute('fill', on ? appliedBadges[key] : circle.dataset.atsFill)
+  }
+}
+
+function applyBadgePreview () {
+  recolorUiBadges()
+  let tries = 0
+  const tick = () => { if (!applyMapBadges() && ++tries < 20) setTimeout(tick, 300) }
+  tick()
+}
+
+// The SDK injects icon SVGs as panels open and lists render — recolor them as they appear.
+let uiBadgeFrame = 0
+new MutationObserver(() => { cancelAnimationFrame(uiBadgeFrame); uiBadgeFrame = requestAnimationFrame(recolorUiBadges) })
+  .observe(document.querySelector('.mymap'), { childList: true, subtree: true })
+
+/* ---------------- color utils ---------------- */
+const normHex = v => {
+  let s = String(v).trim().replace(/^#?/, '#').toUpperCase()
+  if (/^#[0-9A-F]{3}$/.test(s)) s = '#' + [...s.slice(1)].map(c => c + c).join('')
+  return /^#([0-9A-F]{6}|[0-9A-F]{8})$/.test(s) ? s : null
+}
+const lum = hex => {
+  const c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
+    .map(v => v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
+  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+}
+const contrast = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05) }
+
+/* ---------------- render panel ---------------- */
+const $ = s => document.querySelector(s)
+const list = $('#list')
+const rows = {}
+
+function renderList () {
+  list.innerHTML = ''
+  let lastTier = null
+  for (const g of GROUPS) {
+    if (g.tier !== lastTier) {
+      if (g.tier === 'extended') { const ps = document.createElement('div'); ps.id = 'placeSection'; list.append(ps) }
+      lastTier = g.tier
+      const t = document.createElement('div')
+      t.className = 'tier'
+      t.textContent = g.tier === 'documented' ? 'Documented keys' : 'Extended · SDK internal'
+      list.append(t)
+      if (g.tier === 'extended') {
+        const n = document.createElement('div')
+        n.className = 'tier-note'
+        n.textContent = 'Not in the public docs — pulled from the SDK’s built-in theme. They work today but may change without notice; confirm with Atrius before shipping.'
+        list.append(n)
+      }
+    }
+    const det = document.createElement('details')
+    det.className = 'group'
+    det.dataset.group = g.name
+    det.open = g.tier === 'documented'
+    const sum = document.createElement('summary')
+    sum.innerHTML = `<span class="chev">▶</span><span>${g.name}</span><span class="strip"></span><span class="gmod"></span>`
+    det.append(sum)
+    for (const k of Object.keys(g.keys)) det.append(buildRow(k))
+    list.append(det)
+  }
+  const empty = document.createElement('div')
+  empty.className = 'empty'; empty.id = 'empty'; empty.hidden = true
+  empty.textContent = 'No keys match.'
+  list.append(empty)
+}
+
+function buildRow (k) {
+  const { desc } = META[k]
+  const row = document.createElement('div')
+  row.className = 'row'
+  row.dataset.key = k
+  row.dataset.search = (k + ' ' + desc).toLowerCase()
+  row.innerHTML = `
+    <label class="swatch" title="Pick color"><span></span><input type="color"></label>
+    <div class="key" title="${k}">${k}${desc ? `<small>${desc}</small>` : ''}</div>
+    <input class="hex" spellcheck="false" maxlength="9">
+    <span class="cr"></span>
+    <button class="reset" title="Reset to default">↺</button>`
+  const picker = row.querySelector('input[type=color]')
+  const hex = row.querySelector('.hex')
+  picker.addEventListener('input', () => setKey(k, picker.value))
+  hex.addEventListener('input', () => {
+    const n = normHex(hex.value)
+    hex.classList.toggle('invalid', !n && hex.value.trim() !== '')
+    if (n) setKey(k, n, { fromHex: true })
+  })
+  hex.addEventListener('blur', () => { hex.classList.remove('invalid'); syncRow(k) })
+  hex.addEventListener('keydown', e => { if (e.key === 'Enter') hex.blur() })
+  row.querySelector('.reset').addEventListener('click', () => setKey(k, null))
+  rows[k] = { row, picker, hex, chip: row.querySelector('.swatch span'), cr: row.querySelector('.cr') }
+  return row
+}
+
+function syncRow (k, { skipHex = false } = {}) {
+  const r = rows[k]; const v = value(k)
+  r.chip.style.background = v
+  r.picker.value = v.slice(0, 7).toLowerCase()
+  if (!skipHex) r.hex.value = v
+  r.row.classList.toggle('mod', k in state.overrides)
+  const pair = META[k].pair
+  if (pair) {
+    const ratio = contrast(v, value(pair))
+    r.cr.textContent = ratio.toFixed(1)
+    r.cr.className = 'cr ' + (ratio >= 7 ? 'aaa' : ratio >= 4.5 ? 'aa' : 'fail')
+    r.cr.title = `Contrast vs ${pair}: ${ratio.toFixed(2)}:1 — ${ratio >= 7 ? 'AAA' : ratio >= 4.5 ? 'AA' : ratio >= 3 ? 'AA large text only' : 'fails WCAG'}`
+  } else { r.cr.textContent = ''; r.cr.className = 'cr' }
+  if (k.startsWith('categoryBadge')) syncPlaceRow(badgeCat(k)) // keep the Places row's badge swatch in step
+}
+
+function syncChrome () {
+  const n = Object.keys(state.overrides).length + Object.keys(placeEdits()).length
+  $('#count').innerHTML = n ? `<b>${n}</b> changed` : 'defaults'
+  for (const det of list.querySelectorAll('.group')) {
+    const g = GROUPS.find(x => x.name === det.dataset.group)
+    if (!g) continue // map place groups are handled by syncPlaceChrome
+    const keys = Object.keys(g.keys)
+    det.querySelector('.strip').innerHTML = keys.slice(0, 6).map(k => `<i style="background:${value(k)}"></i>`).join('')
+    const m = keys.filter(k => k in state.overrides).length
+    det.querySelector('.gmod').textContent = m ? m : ''
+  }
+  syncPlaceChrome()
+}
+
+function syncAll () { for (const k in rows) syncRow(k); syncPlaces(); syncChrome() }
+
+function setKey (k, v, { fromHex = false } = {}) {
+  const n = v == null ? null : normHex(v)
+  if (n == null || n === def(k)) delete state.overrides[k]
+  else state.overrides[k] = n
+  syncRow(k, { skipHex: fromHex })
+  // keep partner contrast badges fresh
+  for (const other in META) if (META[other].pair === k) syncRow(other)
+  syncChrome(); save(); scheduleApply()
+}
+
+function setMany (obj, { replace = false } = {}) {
+  if (replace) state.overrides = state.palettes[state.mode] = {}
+  for (const [k, v] of Object.entries(obj)) {
+    if (!(k in DEFAULTS)) continue
+    const n = normHex(v)
+    if (!n || n === def(k)) delete state.overrides[k]
+    else state.overrides[k] = n
+  }
+  syncAll(); save(); scheduleApply()
+}
+
+/* ---------------- filter ---------------- */
+$('#search').addEventListener('input', e => {
+  const q = e.target.value.trim().toLowerCase()
+  let any = false
+  for (const det of list.querySelectorAll('.group')) {
+    let hits = 0
+    for (const row of det.querySelectorAll('.row')) {
+      const k = row.dataset.key
+      const hit = !q || row.dataset.search.includes(q) || det.dataset.group.toLowerCase().includes(q)
+      row.hidden = !hit; if (hit) hits++
+    }
+    det.hidden = !hits
+    if (q && hits) det.open = true
+    any ||= hits > 0
+  }
+  $('#empty').hidden = any
+})
+
+/* ---------------- presets / reset ---------------- */
+$('#preset').addEventListener('change', e => {
+  if (e.target.value === 'sdk') setMany({}, { replace: true })
+  if (e.target.value === 'docs') setMany(DOCS_SAMPLE, { replace: true })
+  if (e.target.value === 'united') {
+    if (!venue) { toast('The venue map file is still loading — try again in a moment'); e.target.value = ''; return }
+    // Base-map and place colors go into the light-mode venue file; badges into the current UI palette.
+    for (const [fam, [fill]] of Object.entries(UNITED_MAP.places)) setPlaceRaw(fam, 'fillColor', fill)
+    setMany(UNITED_MAP.badges)
+    toast('United mockup colors loaded (approximations) — press Apply to preview', 4000)
+  }
+  e.target.value = ''
+})
+// In-page confirm: native confirm() is blocked in embedded/sandboxed browsers.
+$('#resetAll').addEventListener('click', () => {
+  const places = Object.keys(placeEdits()).length
+  const ui = Object.keys(state.overrides).length
+  if (!ui && !places) { toast('Nothing to reset — everything is at its default'); return }
+  const body = document.createElement('div')
+  body.className = 'sheet-msg'
+  body.textContent = 'This resets ' + [
+    ui && `${ui} ${state.mode}-mode UI color${ui === 1 ? '' : 's'}`,
+    places && `map colors for ${places} place categor${places === 1 ? 'y' : 'ies'} (light and dark)`,
+  ].filter(Boolean).join(' and ') + ' back to the defaults.'
+  const close = sheet({
+    title: 'Reset all?', body,
+    actions: [
+      btn('Cancel', '', () => close()),
+      btn('Reset', 'primary', () => {
+        state.placeColors[placeKey()] = {}
+        setMany({}, { replace: true })
+        close(); toast('Reset to defaults')
+      }),
+    ],
+  })
+})
+
+/* ---------------- venue ---------------- */
+$('#venueId').value = state.venueId
+$('#accountId').value = state.accountId
+$('#venueApply').addEventListener('click', () => {
+  state.venueId = $('#venueId').value.trim() || 'lax'
+  state.accountId = $('#accountId').value.trim() || 'A11F4Y6SZRXH4X'
+  renderPlaces()
+  save(); applyNow()
+})
+
+/* ---------------- light / dark ----------------
+   Atrius documents dark mode only for iOS/Android. The web SDK has an internal
+   dark map theme (the venue's dark* colors), reachable only through a debug menu
+   item enabled by `debug: { darkModeOption: true }`. Every re-init resets the map
+   to light, so after each apply we flip it back by clicking that item. */
+const sleep = ms => new Promise(r => setTimeout(r, ms))
+async function darkenMap () {
+  const root = document.querySelector('.mymap')
+  const btn = root.querySelector('[aria-label="View menu"]')
+  if (!btn) throw new Error('Map menu not found')
+  root.classList.add('ats-quiet')
+  try {
+    btn.click()
+    let item
+    for (let i = 0; i < 30 && !item; i++) {
+      await sleep(50)
+      item = [...root.querySelectorAll('[role=menuitem]')].find(e => /Toggle Dark Mode/.test(e.textContent))
+    }
+    if (!item) throw new Error('Dark mode toggle not found')
+    item.click()
+  } finally {
+    await sleep(50)
+    root.classList.remove('ats-quiet')
+  }
+}
+
+// SDK bug workaround: each floor's shapes are colored once at load (while the map is
+// still light), and changing floors swaps those light shapes back in; the toggle only
+// re-colors what's on screen. So on every floor change in dark mode, toggle twice.
+let lastOrd = null, refixing = false
+window.addEventListener('message', async e => {
+  const d = e.data
+  if (!d || d.type !== 'LL-server' || d.event !== 'levelChange') return
+  const ord = d.payload?.ord
+  if (ord === lastOrd) return
+  lastOrd = ord
+  if (state.mode !== 'dark' || running || refixing) return
+  refixing = true
+  try { await darkenMap(); await sleep(250); await darkenMap() } catch (err) { console.warn(err) } finally { refixing = false }
+})
+
+function syncMode () {
+  document.querySelectorAll('#modeSeg button').forEach(b => b.classList.toggle('on', b.dataset.mode === state.mode))
+  $('#modeNote').hidden = state.mode !== 'dark'
+}
+document.querySelectorAll('#modeSeg button').forEach(b => b.addEventListener('click', () => {
+  if (state.mode === b.dataset.mode) return
+  state.mode = b.dataset.mode
+  state.overrides = state.palettes[state.mode]
+  syncMode(); syncAll(); save(); applyNow()
+}))
+syncMode()
+
+/* ---------------- flight status ---------------- */
+$('#flightToggle').checked = state.flightStatus
+$('#flightToggle').addEventListener('change', e => {
+  state.flightStatus = e.target.checked
+  save(); applyNow()
+})
+
+/* ---------------- panel toggle ---------------- */
+$('#togglePanel').addEventListener('click', () => {
+  document.body.classList.toggle('collapsed')
+  $('#togglePanel').textContent = document.body.classList.contains('collapsed') ? '◂' : '▸'
+})
+
+/* ---------------- map (re)initialisation ----------------
+   The SDK only reads `theme` at init, but calling LMInit.newMap() again on
+   the same element re-inits in place (~200 ms, camera is preserved). We
+   always send the full color set so a key that was reset really reverts. */
+const status = (s, text) => { $('#status').dataset.state = s; $('#statusText').textContent = text }
+let timer = null, running = false, queued = false
+
+function buildConfig () {
+  const colors = {}
+  for (const k in DEFAULTS) colors[k] = value(k)
+  const config = { venueId: state.venueId, accountId: state.accountId, headless: false, theme: { colors } }
+  // If the flight API fails during the *first* init (e.g. an account without the
+  // add-on), the SDK never fires `ready`. So boot without it and add it on re-init.
+  if (state.flightStatus && booted) Object.assign(config, { plugins: { flightStatus: {} }, poiCategories: FLIGHT_CATEGORIES })
+  // Any `debug` makes the SDK expose its map engine as window._map (used for the badge
+  // preview); darkModeOption also adds the SDK's hidden dark-map toggle.
+  config.debug = state.mode === 'dark' ? { darkModeOption: true } : {}
+  if (Object.keys(placeEdits()).length) config.dataFetch = '__atsVenueFiles' // serve the edited venue theme.json
+  return config
+}
+let booted = false
+
+// Color edits wait for the Apply button unless "Apply changes automatically" is on.
+let pending = false
+function scheduleApply (delay = 140) {
+  if (!state.autoApply) {
+    pending = true; syncApplyBtn()
+    if (!running) status('idle', 'Edits not applied — press Apply')
+    return
+  }
+  clearTimeout(timer)
+  timer = setTimeout(apply, delay)
+}
+
+// Apply button, and structural changes (mode, venue, flight button): apply right away.
+function applyNow () {
+  pending = false; syncApplyBtn()
+  clearTimeout(timer)
+  timer = setTimeout(apply, 0)
+}
+
+function syncApplyBtn () {
+  const b = document.getElementById('applyBtn')
+  if (!b) return
+  b.disabled = !pending
+  b.textContent = pending ? 'Apply changes' : 'Applied'
+}
+
+// Some SDK init failures (e.g. a venue the account can't access) are thrown as
+// unhandled rejections inside the SDK bundle, so newMap() never settles.
+// Catch them here and fail the pending apply immediately.
+let failPending = null
+window.addEventListener('unhandledrejection', e => {
+  const msg = e.reason?.message || String(e.reason ?? '')
+  if (failPending && /venue/i.test(msg)) { e.preventDefault(); failPending(new Error(msg)) }
+})
+
+const FALLBACK = { venueId: 'lax', accountId: 'A11F4Y6SZRXH4X' }
+let lastGood = null
+
+async function apply () {
+  if (running) { queued = true; return }
+  running = true
+  snapshotBadges()
+  status('applying', 'Applying theme…')
+  const t0 = performance.now()
+  try {
+    const sameVenue = lastGood && lastGood.venueId === state.venueId && lastGood.accountId === state.accountId
+    const hadMap = !!document.querySelector('.atrius-map')
+    window.map = await new Promise((resolve, reject) => {
+      failPending = reject
+      setTimeout(() => reject(new Error('Timed out waiting for map')), 15000)
+      // The SDK sometimes never fires `ready` (on a same-venue re-init when the flight
+      // API errors, and occasionally on first load) even though the map and theme did
+      // update. Don't block edits on it: resolve once the map is on screen.
+      // (A bad venue never renders the map, so that still fails via failPending.)
+      if (sameVenue) setTimeout(() => { if (document.querySelector('.atrius-map')) resolve(window.map) }, 2500)
+      else if (!hadMap) {
+        const t = setInterval(() => { if (document.querySelector('.atrius-map')) { clearInterval(t); setTimeout(() => resolve(window.map), 1500) } }, 250)
+        setTimeout(() => clearInterval(t), 15000)
+      }
+      LMInit.newMap('.mymap', buildConfig()).then(resolve, reject)
+    })
+    lastGood = { venueId: state.venueId, accountId: state.accountId }
+    status('ok', `Live · ${state.venueId} · ${Math.round(performance.now() - t0)} ms`)
+    if (!booted) { booted = true; if (state.flightStatus) queued = true }
+    if (state.mode === 'dark') {
+      try { await darkenMap() } catch (err) { console.warn(err); status('error', 'Dark map toggle not found') }
+    }
+    applyBadgePreview() // the re-init reloaded the map's badge images and icons
+  } catch (e) {
+    console.error(e)
+    status('error', 'Error: ' + (e?.message || e))
+    // Roll back a bad venue/account. After a failed init the SDK drops the
+    // `ready` for the next newMap(), so reload for a clean SDK instead of
+    // re-initialising in place. Theme state survives via localStorage.
+    const good = lastGood || FALLBACK
+    if (state.venueId !== good.venueId || state.accountId !== good.accountId) {
+      const allowed = e.message.match(/venue list: (.+)$/)?.[1]
+      const msg = `Venue “${state.venueId}” didn’t load${allowed ? ` — this account has: ${allowed.split(',').join(', ')}` : ''}. Back to ${good.venueId}.`
+      Object.assign(state, good); save()
+      try { sessionStorage.setItem(FLASH, msg) } catch {}
+      location.reload()
+      return
+    }
+  }
+  failPending = null
+  running = false
+  if (queued) { queued = false; apply() }
+}
+
+/* ---------------- apply ---------------- */
+$('#autoApply').checked = !!state.autoApply
+$('#autoApply').addEventListener('change', e => {
+  state.autoApply = e.target.checked
+  save()
+  if (state.autoApply && pending) applyNow()
+})
+$('#applyBtn').addEventListener('click', applyNow)
+syncApplyBtn()
+
+/* ---------------- export / import ---------------- */
+function codeFor (mode) {
+  const src = mode === 'all' ? Object.fromEntries(Object.keys(DEFAULTS).map(k => [k, value(k)])) : state.overrides
+  const keys = Object.keys(src)
+  if (!keys.length) return '// No changes yet — the map is using SDK defaults.'
+  const w = Math.max(...keys.map(k => k.length))
+  const body = keys.map(k => `      ${(k + ':').padEnd(w + 1)} '${src[k]}',`).join('\n')
+  const note = state.mode === 'dark'
+    ? '// Dark palette (from Theme Studio). The web SDK has no documented dark mode —\n// confirm with Atrius how to switch palettes / enable the dark map.\n'
+    : ''
+  const flight = state.flightStatus
+    ? `  plugins: { flightStatus: {} },\n  poiCategories: [\n${FLIGHT_CATEGORIES.map(c => `    { name: '${c.name}', category: '${c.category}' },`).join('\n')}\n  ],\n`
+    : ''
+  return `${note}const config = {\n  venueId: '${state.venueId}',\n  accountId: '${state.accountId}',\n  headless: false,\n${flight}  theme: {\n    colors: {\n${body}\n    }\n  }\n}`
+}
+
+function toast (msg, ms = 1600) {
+  const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg
+  document.body.append(t); setTimeout(() => t.remove(), ms)
+}
+
+function sheet ({ title, body, actions, seg }) {
+  const wrap = document.createElement('div')
+  wrap.className = 'sheet-wrap'
+  wrap.innerHTML = `<div class="sheet" role="dialog" aria-label="${title}"><header><h2>${title}</h2></header><footer></footer></div>`
+  const s = wrap.querySelector('.sheet')
+  if (seg) wrap.querySelector('header').append(seg)
+  s.insertBefore(body, s.querySelector('footer'))
+  for (const a of actions) s.querySelector('footer').append(a)
+  const close = () => wrap.remove()
+  wrap.addEventListener('click', e => { if (e.target === wrap) close() })
+  document.addEventListener('keydown', function esc (e) { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', esc) } })
+  document.body.append(wrap)
+  return close
+}
+const btn = (label, cls, fn) => { const b = document.createElement('button'); b.className = 'btn ' + (cls || ''); b.textContent = label; b.onclick = fn; return b }
+
+$('#openCode').addEventListener('click', () => {
+  let kind = 'ui', scope = 'changed'
+  const pre = document.createElement('pre')
+  const segs = document.createElement('div'); segs.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap'
+  const mkSeg = (opts, get, set) => {
+    const s = document.createElement('div'); s.className = 'seg'
+    for (const [v, l] of opts) {
+      const b = document.createElement('button'); b.dataset.v = v; b.textContent = l
+      b.onclick = () => { set(v); render() }; s.append(b)
+    }
+    s.sync = () => s.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === get()))
+    return s
+  }
+  const kindSeg = mkSeg([['ui', 'UI config'], ['map', 'Map colors']], () => kind, v => { kind = v })
+  const scopeSeg = mkSeg([['changed', 'Changed only'], ['all', 'All']], () => scope, v => { scope = v })
+  segs.append(kindSeg, scopeSeg)
+  const hint = document.createElement('span'); hint.className = 'hint'
+  const payload = () => {
+    if (kind === 'map') return mapExport(scope)
+    const colors = scope === 'all' ? Object.fromEntries(Object.keys(DEFAULTS).map(k => [k, value(k)])) : state.overrides
+    return { text: codeFor(scope), json: JSON.stringify({ theme: { colors } }, null, 2), file: `atrius-theme-${state.venueId}-${state.mode}.json` }
+  }
+  const render = () => {
+    kindSeg.sync(); scopeSeg.sync()
+    pre.textContent = payload().text
+    hint.textContent = kind === 'ui' ? 'Paste into LMInit.newMap(…) config' : 'Send to the Atrius team (venue map theme)'
+  }
+  render()
+  const close = sheet({
+    title: 'Export', body: pre, seg: segs,
+    actions: [
+      hint,
+      btn('Download .json', '', () => {
+        const p = payload()
+        const a = document.createElement('a')
+        a.href = URL.createObjectURL(new Blob([p.json], { type: 'application/json' }))
+        a.download = p.file; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+      }),
+      btn('Copy', 'primary', async () => {
+        const p = payload()
+        await navigator.clipboard.writeText(kind === 'ui' ? p.text : p.json); toast('Copied to clipboard'); close()
+      }),
+    ],
+  })
+})
+
+$('#openImport').addEventListener('click', () => {
+  const ta = document.createElement('textarea')
+  ta.placeholder = "Paste a theme — JSON or JS both work:\n\ntheme: {\n  colors: {\n    primary: '#0A2240',\n    widgetText: '#0A2240'\n  }\n}"
+  const hint = document.createElement('span'); hint.className = 'hint'; hint.textContent = 'Unknown keys are ignored'
+  const close = sheet({
+    title: 'Import theme', body: ta,
+    actions: [
+      hint,
+      btn('Cancel', '', () => close()),
+      btn('Merge', '', () => run(false)),
+      btn('Replace', 'primary', () => run(true)),
+    ],
+  })
+  const run = replace => {
+    // Map place colors: JSON shaped like the venue theme ({ eat: { fillColor, … } }),
+    // i.e. either export from the Map colors tab.
+    let places = 0
+    try {
+      const obj = JSON.parse(ta.value.replace(/^\s*\/\/.*$/gm, ''))
+      if (venue && obj && typeof obj === 'object') {
+        for (const [k, v] of Object.entries(obj)) {
+          if (!FAMILY_KEYS.has(k) || !v || typeof v !== 'object') continue
+          if (replace && !places) state.placeColors[placeKey()] = {}
+          for (const attr of ALL_PLACE_ATTRS) if (v[attr]) { setPlaceRaw(k, attr, v[attr]); places++ }
+        }
+      }
+    } catch {}
+    // UI keys — lenient parse: pull every `key: '#hex'` pair so JSON, JS objects, and snippets all work.
+    const found = {}
+    for (const [, k, v] of ta.value.matchAll(/["']?([A-Za-z][\w]*)["']?\s*:\s*["']?(#[0-9a-fA-F]{3,8})\b/g)) found[k] = v
+    const n = Object.keys(found).filter(k => k in DEFAULTS).length
+    if (!n && !places) { toast('No recognised color keys found'); return }
+    if (n) setMany(found, { replace })
+    else { syncAll(); save(); scheduleApply() }
+    close()
+    toast('Imported ' + [n && `${n} UI key${n === 1 ? '' : 's'}`, places && `${places} map color value${places === 1 ? '' : 's'}`].filter(Boolean).join(' and '))
+  }
+  setTimeout(() => ta.focus(), 30)
+})
+
+/* ---------------- boot ---------------- */
+const FLASH = 'atrius-theme-studio-flash'
+window.LMInit = LMInit
+renderList(); syncAll(); renderPlaces(); apply()
+try {
+  const flash = sessionStorage.getItem(FLASH)
+  if (flash) { sessionStorage.removeItem(FLASH); toast(flash, 6000) }
+} catch {}
+</script>
+</body>
+</html>
