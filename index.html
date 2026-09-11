@@ -84,6 +84,13 @@
   .controls .seg { height: 32px; align-items: center; }
   .controls .seg button { height: 26px; padding: 0 9px; }
   .mode-note { margin-top: 8px; font-size: 11px; line-height: 1.45; color: var(--ink-3); }
+  .gen-row {
+    display: grid; grid-template-columns: 30px 1fr auto auto; gap: 8px; align-items: center;
+    margin-top: 10px; padding: 8px; border: 1px solid var(--line); border-radius: 9px; background: var(--bg-2);
+  }
+  .gen-label { font-size: 12.5px; font-weight: 500; line-height: 1.25; min-width: 0; }
+  .gen-label small { display: block; font-size: 10.5px; font-weight: 400; color: var(--ink-3); }
+  .gen-row select, .gen-row .btn { height: 30px; font-size: 12px; }
   /* hides the SDK menu while the studio clicks its hidden dark-mode item */
   .ats-quiet [role=menu], .ats-quiet [role=menuitem] { opacity: 0 !important; }
   .field, select, .btn {
@@ -109,6 +116,8 @@
   .venue-grid label { font-size: 11px; color: var(--ink-3); display: grid; gap: 4px; }
   .venue-grid .field { font-family: var(--mono); font-size: 12px; }
   .venue-grid .btn { align-self: end; }
+  .venue-grid select.field { font-family: var(--ui); min-width: 0; }
+  .venue-note { margin-top: 6px; font-size: 11px; line-height: 1.45; color: var(--ink-3); }
 
   .list { flex: 1; overflow-y: auto; padding: 6px 0 24px; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
 
@@ -163,6 +172,12 @@
   .cr.aaa { color: var(--good); background: rgba(95,201,138,.1); }
   .cr.aa { color: var(--warn); background: rgba(240,184,74,.1); }
   .cr.fail { color: var(--bad); background: rgba(240,106,90,.12); }
+  .cr:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .tip {
+    position: fixed; z-index: 40; max-width: 260px; padding: 8px 10px; border-radius: 8px;
+    background: var(--ink); color: var(--bg); font: 12px/1.45 var(--ui); white-space: pre-line;
+    box-shadow: 0 8px 24px rgba(0,0,0,.35); pointer-events: none;
+  }
   .reset {
     width: 18px; height: 18px; border: 0; padding: 0; background: none; color: var(--ink-3);
     cursor: pointer; font-size: 13px; line-height: 1; visibility: hidden; border-radius: 4px;
@@ -237,21 +252,27 @@
           <option value="">Presets</option>
           <option value="sdk">SDK defaults</option>
           <option value="docs">Docs sample (purple)</option>
-          <option value="united">United map mockup (approx.)</option>
+          <option value="united">Blueish Maps</option>
         </select>
+      </div>
+      <div class="gen-row">
+        <label class="swatch" title="Theme color"><span id="genChip"></span><input type="color" id="genColor"></label>
+        <div class="gen-label">Generate from one color<small>Map, UI & badges · places keep their hues</small></div>
+        <select id="genTone" title="Map tone in light mode"><option value="soft">Soft map</option><option value="bold">Bold map</option></select>
+        <button class="btn" id="genApply">Generate</button>
       </div>
       <div class="mode-note" id="modeNote" hidden>Dark mode: editing a separate dark palette (a studio starting point — Atrius publishes none for web). The dark map comes from the venue’s own dark colors via an undocumented SDK toggle.</div>
       <label class="switch" title="Adds plugins.flightStatus and a Flight Status shortcut under the search bar">
         <input type="checkbox" id="flightToggle"><span>Flight Status button</span><em>flight data needs the Atrius add-on</em>
       </label>
-      <details class="venue">
-        <summary>Venue & account</summary>
+      <details class="venue" open>
+        <summary>Airport & account</summary>
         <div class="venue-grid">
-          <label>venueId <input class="field" id="venueId" list="venues" spellcheck="false"></label>
-          <datalist id="venues"><option>lax</option><option>sea</option><option>gru</option><option>grupo</option><option>grusp</option><option>stn</option></datalist>
-          <label>accountId <input class="field" id="accountId" spellcheck="false"></label>
-          <button class="btn" id="venueApply">Load</button>
+          <label>Airport <select class="field" id="venueSelect"></select></label>
+          <label>Account ID <input class="field" id="accountId" spellcheck="false" placeholder="A11F4Y6SZRXH4X"></label>
+          <button class="btn" id="venueApply" title="Load this account's airports">Load</button>
         </div>
+        <div class="venue-note" id="venueNote"></div>
       </details>
     </div>
 
@@ -451,24 +472,86 @@ const PLACE_GROUPS = [
   ]],
 ]
 
-// Approximated from the "Using only the United colors" map mockup — a starting point to refine.
-const OTHER = ['#C6C8DE', '#A3A6C6']
-const UNITED_MAP = {
-  places: {
-    'basemap.venue': ['#4B4F95', '#4B4F95'], 'basemap.outdoor': ['#4B4F95', '#4B4F95'],
-    'basemap.runway': ['#434889', '#434889'], 'basemap.road': ['#0B1A6B', '#0B1A6B'],
-    'basemap.curb': ['#5A5FA3', '#5A5FA3'], 'basemap.jetway': ['#8A8FC0', '#6E73AC'],
-    'element.building': ['#8A8FC0', '#6E73AC'], 'element.presecurity': ['#9EA3D1', '#6E73AC'],
-    'element.postsecurity': ['#9EA3D1', '#6E73AC'], 'element.wall': ['#7A7FB8', '#7A7FB8'],
-    eat: ['#E3ECFB', '#B9C8EE'], shop: ['#EAE6F7', '#C9C0EC'],
-    restroom: OTHER, services: OTHER, relax: OTHER, gate: OTHER, security: OTHER, checkin: OTHER,
-    ticketing: OTHER, baggage: OTHER, transport: OTHER, art: OTHER,
+/* United preset — built only from United's brand palette ("united colors.txt").
+   A bluish map in both modes: light = mid-navy tarmac with pale concourses,
+   dark = deep navy. Each mode gets its own UI palette and badge colors. */
+const U = {
+  unitedBlue: '#1414D2', unitedBlue35Black: '#0D0D8F', darkBlue: '#051464', mediumBlue: '#276EF1',
+  darkPurple: '#551E5F', mediumPurple: '#695FE6', mediumGreen22Black: '#46A46D', white: '#FFFFFF',
+  darkGrey: '#242424', mediumGrey: '#555555', lightGrey: '#878787', lightGrey75: '#A5A5A5', tonalGrey50: '#EBEBE9',
+  darkModeGrey: '#121212', vengeanceGrey: '#DEDEDE',
+  alertLight: { green: '#1B7742', red: '#D50032', yellow: '#FFC658' },
+  alertDark: { green: '#83DDA9', red: '#F87878', yellow: '#FFDC8C', blue: '#93B7F8' },
+  blue75: '#5D92F5', blue50: '#93B7F8', blue25: '#C9DBFC', blue15: '#DFE9FD',
+  purple75: '#8E87EC', purple50: '#B4AFF3', purple15: '#E9E7FB', darkPurple75: '#805687',
+  navy75: '#444F8B', navy50: '#8289B1', navy25: '#C0C4D8', navy15: '#DADCE8', // darkBlue opacity steps
+}
+// Every categoryBadge key: named ones get their color, the rest the "other" grey.
+const unitedBadges = (named, other) => Object.fromEntries(Object.keys(DEFAULTS)
+  .filter(k => k.startsWith('categoryBadge') && k !== 'categoryBadgeInactive')
+  .map(k => [k, named[k.slice('categoryBadge'.length)] || other]))
+
+const UNITED = {
+  ui: {
+    light: {
+      primary: U.unitedBlue, primaryButton: U.unitedBlue, primaryButtonText: U.white, primaryButtonHover: U.unitedBlue35Black,
+      secondary: U.darkBlue, secondaryButton: U.blue15, secondaryButtonText: U.unitedBlue, secondaryButtonHover: U.blue25,
+      primaryText: U.darkGrey, secondaryText: U.mediumGrey, background: U.white, errorState: U.alertLight.red,
+      toolTipBackground: U.darkBlue, toolTipText: U.white,
+      mapNavBackground: U.darkBlue, mapNavText: U.white, mapNavSearchResults: U.unitedBlue, mapNavSearchResultsText: U.white,
+      widgetBackground: U.white, widgetIconFill: U.unitedBlue, widgetText: U.darkBlue, widgetIcons: U.unitedBlue,
+      statusOpenBackground: U.alertLight.green, statusOpenText: U.white,
+      statusClosedBackground: U.tonalGrey50, statusClosedText: U.darkGrey,
+      statusEarlyBackground: U.unitedBlue, statusEarlyText: U.white,
+      statusDelayedBackground: U.alertLight.yellow, statusDelayedText: U.darkGrey,
+      statusCancelledBackground: U.alertLight.red, statusCancelledText: U.white,
+      destructiveButton: U.alertLight.red, focusOutlineColor: U.mediumBlue, modHeaderBackground: U.darkBlue,
+      myLocationPrimaryButton: U.unitedBlue, myLocationPrimaryButtonHover: U.unitedBlue35Black,
+      statusAlertBackground: U.alertLight.red, statusActiveBackground: U.alertLight.green, statusInfoBackground: U.unitedBlue,
+      statusWarningBackground: U.alertLight.yellow, statusWarningText: U.darkGrey,
+      statusSuccessBackground: U.alertLight.green, statusErrorBackground: U.alertLight.red,
+      miscBadgePinColor: U.unitedBlue, miscBadgePinStroke: U.unitedBlue35Black,
+      ...unitedBadges({ Eat: U.mediumBlue, Shop: U.mediumPurple, Restroom: U.unitedBlue35Black, Gate: U.unitedBlue,
+        Relax: U.darkPurple, Security: U.alertLight.red, Exit: U.mediumGreen22Black, Wayfinding: U.unitedBlue }, U.lightGrey),
+    },
+    dark: {
+      primary: U.blue50, primaryButton: U.unitedBlue, primaryButtonText: U.white, primaryButtonHover: U.mediumBlue,
+      secondary: U.vengeanceGrey, secondaryButton: U.darkGrey, secondaryButtonText: U.blue50, secondaryButtonHover: U.mediumGrey,
+      primaryText: U.vengeanceGrey, secondaryText: U.lightGrey75, background: U.darkModeGrey, errorState: U.alertDark.red,
+      toolTipBackground: U.vengeanceGrey, toolTipText: U.darkModeGrey,
+      mapNavBackground: U.darkBlue, mapNavText: U.white, mapNavSearchResults: U.unitedBlue, mapNavSearchResultsText: U.white,
+      widgetBackground: U.darkGrey, widgetIconFill: U.blue50, widgetText: U.vengeanceGrey, widgetIcons: U.blue50,
+      statusOpenBackground: U.alertDark.green, statusOpenText: U.darkModeGrey,
+      statusClosedBackground: U.mediumGrey, statusClosedText: U.vengeanceGrey,
+      statusEarlyBackground: U.alertDark.blue, statusEarlyText: U.darkModeGrey,
+      statusDelayedBackground: U.alertDark.yellow, statusDelayedText: U.darkModeGrey,
+      statusCancelledBackground: U.alertDark.red, statusCancelledText: U.darkModeGrey,
+      destructiveButton: U.alertLight.red, focusOutlineColor: U.blue50, modHeaderBackground: U.darkBlue,
+      myLocationPrimaryButton: U.mediumBlue, myLocationPrimaryButtonHover: U.blue75,
+      statusAlertBackground: U.alertDark.red, statusAlertText: U.darkModeGrey,
+      statusActiveBackground: U.alertDark.green, statusActiveText: U.darkModeGrey,
+      statusInfoBackground: U.alertDark.blue, statusInfoText: U.darkModeGrey,
+      statusWarningBackground: U.alertDark.yellow, statusWarningText: U.darkModeGrey,
+      statusInactiveBackground: U.mediumGrey, statusInactiveText: U.vengeanceGrey,
+      statusSuccessBackground: U.alertDark.green, statusSuccessText: U.darkModeGrey,
+      statusErrorBackground: U.alertDark.red, statusErrorText: U.darkModeGrey,
+      miscBadgePinColor: U.mediumBlue, miscBadgePinStroke: U.blue50,
+      ...unitedBadges({ Eat: U.blue75, Shop: U.purple75, Restroom: U.navy75, Gate: U.mediumBlue,
+        Relax: U.darkPurple75, Security: U.alertLight.red, Exit: U.mediumGreen22Black, Wayfinding: U.mediumBlue }, U.mediumGrey),
+    },
   },
-  badges: {
-    categoryBadgeEat: '#2F6BF2', categoryBadgeShop: '#6B5CE7', categoryBadgeRestroom: '#0E1452', categoryBadgeGate: '#1F18D4',
-    categoryBadgeServices: '#8A8A8A', categoryBadgeRelax: '#8A8A8A', categoryBadgeSecurity: '#8A8A8A', categoryBadgeCheckin: '#8A8A8A',
-    categoryBadgeTicketing: '#8A8A8A', categoryBadgeBaggage: '#8A8A8A', categoryBadgeTransport: '#8A8A8A',
-    categoryBadgeParking: '#8A8A8A', categoryBadgeArt: '#8A8A8A',
+  // Venue map file fills: [light fillColor, dark darkFillColor]
+  places: {
+    'basemap.venue': [U.navy75, U.darkBlue], 'basemap.outdoor': [U.navy75, U.darkBlue],
+    'basemap.runway': [U.unitedBlue35Black, U.unitedBlue35Black], 'basemap.road': [U.darkBlue, U.navy75],
+    'basemap.curb': [U.navy50, U.navy75], 'basemap.jetway': [U.navy50, U.navy75], 'basemap.transitline': [U.navy25, U.navy50],
+    'element.building': [U.navy50, U.unitedBlue35Black],
+    'element.presecurity': [U.navy25, U.navy75], 'element.postsecurity': [U.navy25, U.navy75],
+    'element.wall': [U.navy50, U.navy50], 'element.opentobelow': [U.navy15, U.darkBlue],
+    'element.nonaccessible': [U.navy50, U.unitedBlue35Black],
+    eat: [U.blue15, U.blue50], shop: [U.purple15, U.purple50],
+    ...Object.fromEntries(['restroom', 'services', 'relax', 'gate', 'security', 'checkin', 'ticketing', 'baggage',
+      'transport', 'parking', 'art'].map(f => [f, [U.navy15, U.navy50]])),
   },
 }
 const FAMILY_KEYS = new Set(PLACE_GROUPS.flatMap(([, fams]) => fams.map(([k]) => k)))
@@ -853,8 +936,13 @@ function syncRow (k, { skipHex = false } = {}) {
     const ratio = contrast(v, value(pair))
     r.cr.textContent = ratio.toFixed(1)
     r.cr.className = 'cr ' + (ratio >= 7 ? 'aaa' : ratio >= 4.5 ? 'aa' : 'fail')
-    r.cr.title = `Contrast vs ${pair}: ${ratio.toFixed(2)}:1 — ${ratio >= 7 ? 'AAA' : ratio >= 4.5 ? 'AA' : ratio >= 3 ? 'AA large text only' : 'fails WCAG'}`
-  } else { r.cr.textContent = ''; r.cr.className = 'cr' }
+    const verdict = ratio >= 7 ? 'AAA — passes for all text'
+      : ratio >= 4.5 ? 'AA — passes for normal text (AAA needs 7:1)'
+      : ratio >= 3 ? 'AA for large text only (18px+, or 14px bold) — normal text needs 4.5:1'
+      : 'Fails WCAG contrast — needs 4.5:1 for normal text'
+    r.cr.dataset.tip = `Contrast ${ratio.toFixed(2)} : 1\n${k} ${v} on ${pair} ${value(pair)}\n${verdict}`
+    r.cr.tabIndex = 0
+  } else { r.cr.textContent = ''; r.cr.className = 'cr'; delete r.cr.dataset.tip; r.cr.removeAttribute('tabindex') }
   if (k.startsWith('categoryBadge')) syncPlaceRow(badgeCat(k)) // keep the Places row's badge swatch in step
 }
 
@@ -895,6 +983,28 @@ function setMany (obj, { replace = false } = {}) {
   syncAll(); save(); scheduleApply()
 }
 
+/* ---------------- tooltips ----------------
+   Native title tooltips don't appear in some embedded browsers, so anything with
+   data-tip (the contrast scores) gets a small tooltip on hover, keyboard focus or click. */
+const tip = document.createElement('div')
+tip.className = 'tip'; tip.hidden = true; tip.setAttribute('role', 'tooltip')
+document.body.append(tip)
+function showTip (el) {
+  tip.textContent = el.dataset.tip
+  tip.hidden = false
+  const r = el.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight
+  tip.style.left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)) + 'px'
+  tip.style.top = (r.top - h - 8 < 8 ? r.bottom + 8 : r.top - h - 8) + 'px'
+}
+const hideTip = () => { tip.hidden = true }
+const tipTarget = e => { const el = e.target.closest?.('[data-tip]'); return el && el.dataset.tip ? el : null }
+document.addEventListener('mouseover', e => { const el = tipTarget(e); if (el) showTip(el) })
+document.addEventListener('mouseout', e => { const el = tipTarget(e); if (el && !el.contains(e.relatedTarget)) hideTip() })
+document.addEventListener('focusin', e => { const el = tipTarget(e); if (el) showTip(el) })
+document.addEventListener('focusout', hideTip)
+document.addEventListener('click', e => { const el = tipTarget(e); if (el) showTip(el) })
+list.addEventListener('scroll', hideTip)
+
 /* ---------------- filter ---------------- */
 $('#search').addEventListener('input', e => {
   const q = e.target.value.trim().toLowerCase()
@@ -914,18 +1024,164 @@ $('#search').addEventListener('input', e => {
 })
 
 /* ---------------- presets / reset ---------------- */
-$('#preset').addEventListener('change', e => {
-  if (e.target.value === 'sdk') setMany({}, { replace: true })
-  if (e.target.value === 'docs') setMany(DOCS_SAMPLE, { replace: true })
-  if (e.target.value === 'united') {
-    if (!venue) { toast('The venue map file is still loading — try again in a moment'); e.target.value = ''; return }
-    // Base-map and place colors go into the light-mode venue file; badges into the current UI palette.
-    for (const [fam, [fill]] of Object.entries(UNITED_MAP.places)) setPlaceRaw(fam, 'fillColor', fill)
-    setMany(UNITED_MAP.badges)
-    toast('United mockup colors loaded (approximations) — press Apply to preview', 4000)
+// Presets apply straight away (no Apply press); single-key edits still wait for Apply.
+// A preset is a complete look — both palettes (light + dark) and this venue's map
+// colors — so switching presets never leaves colors behind from the previous one.
+const PRESETS = {
+  sdk: { light: {}, dark: {}, places: {} },
+  docs: { light: DOCS_SAMPLE, dark: {}, places: {} },
+  united: { light: UNITED.ui.light, dark: UNITED.ui.dark, places: UNITED.places },
+}
+// Apply a complete look { light, dark, places } — used by presets and the generator.
+function applyLook (p, label) {
+  if (Object.keys(p.places).length && !venue) { toast('The venue map file is still loading — try again in a moment'); return }
+  const clean = (pal, defs) => Object.fromEntries(Object.entries(pal)
+    .map(([k, v]) => [k, normHex(v)]).filter(([k, v]) => k in defs && v && v !== defs[k]))
+  state.palettes.light = clean(p.light, DEFAULTS)
+  state.palettes.dark = clean(p.dark, DARK_DEFAULTS)
+  state.overrides = state.palettes[state.mode]
+  state.placeColors[placeKey()] = {}
+  for (const [fam, [light, dark]] of Object.entries(p.places)) {
+    setPlaceRaw(fam, 'fillColor', light); setPlaceRaw(fam, 'darkFillColor', dark)
   }
+  syncAll(); save(); applyNow()
+  toast(`${label} applied — light and dark`, 2500)
+}
+
+$('#preset').addEventListener('change', e => {
+  const p = PRESETS[e.target.value]
+  const label = e.target.selectedOptions[0]?.textContent
   e.target.value = ''
+  if (p) applyLook(p, label)
 })
+
+/* ---------------- generate from one color ----------------
+   One seed color → a full look for both modes. The base map and UI are built from the
+   seed's hue; each place category and badge keeps its own hue (nudged 15% toward the
+   seed) at a shared lightness/saturation so they stay distinct but read as one family.
+   Text/button pairs are pushed to WCAG AA; status colors keep their meaning. */
+const hexToHsl = hex => {
+  const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2
+  if (max === min) return [0, 0, l * 100]
+  const d = max - min, s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+  const h = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4
+  return [h * 60, s * 100, l * 100]
+}
+const hsl = (h, s, l) => {
+  s = Math.max(0, Math.min(100, s)) / 100; l = Math.max(0, Math.min(100, l)) / 100; h = ((h % 360) + 360) % 360
+  const k = n => (n + h / 30) % 12, a = s * Math.min(l, 1 - l)
+  const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1))
+  return '#' + [f(0), f(8), f(4)].map(x => Math.round(x * 255).toString(16).padStart(2, '0')).join('').toUpperCase()
+}
+// Step lightness away from the background until the pair reaches `min` contrast.
+const withContrast = (h, s, l, bg, min = 4.5) => {
+  const dir = lum(bg) > 0.4 ? -1 : 1
+  let c = hsl(h, s, l)
+  for (let i = 0; i < 70 && contrast(c, bg) < min; i++) { l += dir * 1.5; c = hsl(h, s, l) }
+  return c
+}
+const hueToward = (h, target, amount) => h + ((((target - h) % 360) + 540) % 360 - 180) * amount
+
+function generateLook (seed, tone) {
+  const [H, S0] = hexToHsl(seed)
+  const S = Math.max(S0, 25) // keep some color even when the seed is greyish
+  const sat = f => Math.min(100, S * f)
+  const bold = tone === 'bold'
+
+  // ---- UI, light
+  const L = {}
+  L.primary = withContrast(H, sat(1), 45, '#FFFFFF')
+  L.primaryButton = withContrast(H, sat(1), 42, '#FFFFFF')
+  L.primaryButtonHover = withContrast(H, sat(1), 32, '#FFFFFF', 7)
+  const navL = hsl(H, sat(0.5), 18), widgetBgL = hsl(H, sat(0.3), 98)
+  Object.assign(L, {
+    primaryButtonText: '#FFFFFF', secondary: hsl(H, sat(0.4), 25),
+    secondaryButton: hsl(H, sat(0.6), 95), secondaryButtonHover: hsl(H, sat(0.6), 90),
+    secondaryButtonText: withContrast(H, sat(1), 42, hsl(H, sat(0.6), 95)),
+    primaryText: hsl(H, sat(0.2), 14), secondaryText: withContrast(H, sat(0.12), 42, '#FFFFFF'), background: '#FFFFFF',
+    toolTipBackground: navL, toolTipText: '#FFFFFF', mapNavBackground: navL, mapNavText: '#FFFFFF',
+    mapNavSearchResults: L.primaryButton, mapNavSearchResultsText: '#FFFFFF',
+    widgetBackground: widgetBgL, widgetIconFill: L.primary, widgetIcons: L.primary,
+    widgetText: withContrast(H, sat(0.3), 20, widgetBgL, 7),
+    focusOutlineColor: hsl(H, sat(1), 50), modHeaderBackground: navL,
+    myLocationPrimaryButton: L.primaryButton, myLocationPrimaryButtonHover: L.primaryButtonHover,
+    miscBadgePinColor: L.primaryButton, miscBadgePinStroke: L.primaryButtonHover,
+    statusEarlyBackground: L.primaryButton, statusInfoBackground: L.primaryButton,
+  })
+
+  // ---- UI, dark
+  const bgD = hsl(H, sat(0.25), 8), panelD = hsl(H, sat(0.22), 14), textD = hsl(H, sat(0.1), 90)
+  const D = {}
+  D.primary = withContrast(H, sat(0.9), 70, bgD)
+  D.primaryButton = withContrast(H, sat(1), 45, '#FFFFFF')
+  Object.assign(D, {
+    primaryButtonText: '#FFFFFF', primaryButtonHover: hsl(H, sat(1), 55),
+    secondary: hsl(H, sat(0.1), 85), secondaryButton: hsl(H, sat(0.25), 20), secondaryButtonHover: hsl(H, sat(0.25), 26),
+    secondaryButtonText: withContrast(H, sat(0.9), 70, hsl(H, sat(0.25), 20)),
+    primaryText: textD, secondaryText: withContrast(H, sat(0.1), 66, bgD), background: bgD,
+    toolTipBackground: textD, toolTipText: bgD,
+    mapNavBackground: hsl(H, sat(0.5), 18), mapNavText: '#FFFFFF',
+    mapNavSearchResults: D.primaryButton, mapNavSearchResultsText: '#FFFFFF',
+    widgetBackground: panelD, widgetIconFill: D.primary, widgetIcons: D.primary, widgetText: textD,
+    focusOutlineColor: D.primary, modHeaderBackground: hsl(H, sat(0.5), 18),
+    statusClosedBackground: hsl(H, sat(0.15), 30), statusClosedText: textD,
+    statusInactiveBackground: hsl(H, sat(0.15), 30), statusInactiveText: textD,
+    myLocationPrimaryButton: D.primaryButton, myLocationPrimaryButtonHover: D.primaryButtonHover,
+    miscBadgePinColor: D.primaryButton, miscBadgePinStroke: D.primary,
+    statusEarlyBackground: D.primary, statusEarlyText: bgD, statusInfoBackground: D.primary, statusInfoText: bgD,
+  })
+
+  // ---- Badges: each category's own hue (Atrius badge guide colors), harmonized
+  for (const k of Object.keys(DEFAULTS).filter(k => k.startsWith('categoryBadge') && k !== 'categoryBadgeInactive')) {
+    const [h, s] = hexToHsl(DEFAULTS[k])
+    if (s < 12) { L[k] = hsl(H, 18, 40); D[k] = hsl(H, 18, 48); continue }
+    const nh = hueToward(h, H, 0.15)
+    L[k] = hsl(nh, 55, 46); D[k] = hsl(nh, 50, 56)
+  }
+
+  // ---- Venue map: base map from the seed, places keep their own hue
+  const base = bold
+    ? { venue: [40, 0.4], outdoor: [40, 0.4], runway: [24, 0.7], road: [18, 0.8], curb: [60, 0.35], jetway: [60, 0.3],
+        transitline: [78, 0.3], building: [60, 0.3], floor: [80, 0.3], wall: [60, 0.3], opentobelow: [88, 0.3], nonaccessible: [60, 0.3] }
+    : { venue: [93, 0.25], outdoor: [90, 0.22], runway: [84, 0.12], road: [78, 0.35], curb: [86, 0.2], jetway: [80, 0.2],
+        transitline: [70, 0.25], building: [80, 0.2], floor: [96, 0.25], wall: [74, 0.15], opentobelow: [90, 0.2], nonaccessible: [78, 0.15] }
+  const baseDark = { venue: [bold ? 14 : 11, 0.55], outdoor: [bold ? 14 : 11, 0.55], runway: [18, 0.5], road: [32, 0.35],
+    curb: [30, 0.3], jetway: [30, 0.3], transitline: [45, 0.3], building: [20, 0.5], floor: [28, 0.35], wall: [42, 0.3],
+    opentobelow: [12, 0.5], nonaccessible: [20, 0.4] }
+  const baseKey = { 'basemap.venue': 'venue', 'basemap.outdoor': 'outdoor', 'basemap.runway': 'runway', 'basemap.road': 'road',
+    'basemap.curb': 'curb', 'basemap.jetway': 'jetway', 'basemap.transitline': 'transitline', 'element.building': 'building',
+    'element.presecurity': 'floor', 'element.postsecurity': 'floor', 'element.wall': 'wall',
+    'element.opentobelow': 'opentobelow', 'element.nonaccessible': 'nonaccessible' }
+  const places = {}
+  for (const [fam, key] of Object.entries(baseKey)) {
+    if (!venue?.theme[fam]?.fillColor) continue
+    places[fam] = [hsl(H, sat(base[key][1]), base[key][0]), hsl(H, sat(baseDark[key][1]), baseDark[key][0])]
+  }
+  for (const [fam] of PLACE_GROUPS.find(([name]) => name === 'Places')[1]) {
+    const orig = normHex(venue?.theme[fam]?.fillColor || '')
+    if (!orig) continue
+    const [h, s] = hexToHsl(orig)
+    if (s < 12) { places[fam] = [hsl(H, bold ? 18 : 12, bold ? 86 : 84), hsl(H, 15, 36)]; continue }
+    const nh = hueToward(h, H, 0.15)
+    places[fam] = [hsl(nh, bold ? 55 : 50, bold ? 88 : 80), hsl(nh, 40, 42)]
+  }
+  return { light: L, dark: D, places }
+}
+
+const genColor = $('#genColor'), genTone = $('#genTone'), genChip = $('#genChip')
+genColor.value = (state.genColor || '#1414D2').toLowerCase()
+genTone.value = state.genTone || 'bold'
+genChip.style.background = genColor.value
+genColor.addEventListener('input', () => { genChip.style.background = genColor.value })
+function runGenerator () {
+  const seed = normHex(genColor.value)
+  state.genColor = seed; state.genTone = genTone.value
+  applyLook(generateLook(seed, genTone.value), `Look from ${seed} (${genTone.value === 'bold' ? 'bold' : 'soft'} map)`)
+}
+genColor.addEventListener('change', runGenerator)
+genTone.addEventListener('change', runGenerator)
+$('#genApply').addEventListener('click', runGenerator)
 // In-page confirm: native confirm() is blocked in embedded/sandboxed browsers.
 $('#resetAll').addEventListener('click', () => {
   const places = Object.keys(placeEdits()).length
@@ -951,14 +1207,67 @@ $('#resetAll').addEventListener('click', () => {
 })
 
 /* ---------------- venue ---------------- */
-$('#venueId').value = state.venueId
+/* Airports come from the account's manifest (v5.json): one entry per airport, skipping
+   language variants (same venueCode, another locale). Atrius's public demo account has
+   LAX, SEA, STN and GRU; any other account the team is licensed for lists its own. */
+const DEMO_ACCOUNT = 'A11F4Y6SZRXH4X'
+const accountAirports = {}
+function loadAirports (accountId) {
+  if (!accountAirports[accountId]) {
+    accountAirports[accountId] = fetch(`https://a.locuslabs.com/accounts/${accountId}/v5.json`)
+      .then(r => { if (!r.ok) throw new Error(`Couldn’t load account “${accountId}” (${r.status})`); return r.json() })
+      .then(manifest => {
+        const byCode = new Map()
+        for (const [id, v] of Object.entries(manifest)) {
+          const code = String(v.venueCode || id).toLowerCase()
+          const entry = { id, name: v.name || id, code: String(v.airportCode || code).toUpperCase() }
+          // Prefer the entry whose id is the venue code (e.g. "gru" over "grupo").
+          if (!byCode.has(code) || id === code) byCode.set(code, entry)
+        }
+        return [...byCode.values()].sort((a, b) => a.name.localeCompare(b.name))
+      })
+    accountAirports[accountId].catch(() => delete accountAirports[accountId])
+  }
+  return accountAirports[accountId]
+}
+
+async function fillAirports () {
+  const sel = $('#venueSelect'), note = $('#venueNote')
+  sel.disabled = true
+  sel.innerHTML = '<option>Loading…</option>'
+  try {
+    const airports = await loadAirports(state.accountId)
+    const opts = airports.map(a => `<option value="${a.id}">${a.name} (${a.code})</option>`)
+    if (!airports.some(a => a.id === state.venueId)) opts.unshift(`<option value="${state.venueId}">${state.venueId}</option>`)
+    sel.innerHTML = opts.join('')
+    sel.value = state.venueId
+    note.textContent = state.accountId === DEMO_ACCOUNT
+      ? 'Atrius’s public demo account: LA, Seattle, London Stansted and São Paulo. For other airports (e.g. ATL, ORD), enter an Atrius account that includes them.'
+      : `${airports.length} airport${airports.length === 1 ? '' : 's'} on this account.`
+  } catch (e) {
+    sel.innerHTML = `<option value="${state.venueId}">${state.venueId}</option>`
+    note.textContent = e.message
+  }
+  sel.disabled = false
+}
+
 $('#accountId').value = state.accountId
-$('#venueApply').addEventListener('click', () => {
-  state.venueId = $('#venueId').value.trim() || 'lax'
-  state.accountId = $('#accountId').value.trim() || 'A11F4Y6SZRXH4X'
-  renderPlaces()
-  save(); applyNow()
+$('#venueSelect').addEventListener('change', e => {
+  state.venueId = e.target.value
+  renderPlaces(); save(); applyNow()
 })
+$('#venueApply').addEventListener('click', async () => {
+  const accountId = $('#accountId').value.trim() || DEMO_ACCOUNT
+  let airports
+  try { airports = await loadAirports(accountId) } catch (e) { toast(e.message, 4000); return }
+  if (!airports.length) { toast('No airports found on that account', 4000); return }
+  state.accountId = accountId
+  $('#accountId').value = accountId
+  if (!airports.some(a => a.id === state.venueId)) state.venueId = airports[0].id
+  await fillAirports()
+  renderPlaces(); save(); applyNow()
+})
+fillAirports()
 
 /* ---------------- light / dark ----------------
    Atrius documents dark mode only for iOS/Android. The web SDK has an internal
