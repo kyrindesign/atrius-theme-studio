@@ -251,8 +251,8 @@
         <select id="preset" title="Load a preset">
           <option value="">Presets</option>
           <option value="sdk">SDK defaults</option>
-          <option value="docs">Docs sample (purple)</option>
-          <option value="united">Blueish Maps</option>
+          <option value="flightaware">FlightAware Blue</option>
+          <option value="unitedblue">United Blue</option>
         </select>
       </div>
       <div class="gen-row">
@@ -262,6 +262,9 @@
         <button class="btn" id="genApply">Generate</button>
       </div>
       <div class="mode-note" id="modeNote" hidden>Dark mode: editing a separate dark palette (a studio starting point — Atrius publishes none for web). The dark map comes from the venue’s own dark colors via an undocumented SDK toggle.</div>
+      <label class="switch" title="Some SDK text ignores the theme (hard-coded #333/#666/#000). This host-page CSS points it at theme colors; export it under Host CSS.">
+        <input type="checkbox" id="sdkFixToggle"><span>Fix SDK text contrast</span><em>host-page CSS · exported</em>
+      </label>
       <label class="switch" title="Adds plugins.flightStatus and a Flight Status shortcut under the search bar">
         <input type="checkbox" id="flightToggle"><span>Flight Status button</span><em>flight data needs the Atrius add-on</em>
       </label>
@@ -390,23 +393,14 @@ const GROUPS = [
     Portal: '#525466', Recreation: '#A386DB', Relax: '#A386DB', Restroom: '#FF9F48', Room: '#5C8BE0',
     Security: '#DC4747', Services: '#525466', Shop: '#59A6ED', Ticketing: '#525466', Transport: '#525466',
     Wayfinding: '#E2611A', Workstation: '#85B0E2',
+    // Studio-only: terminal/concourse tag diamonds (sprite "dynamicLabel"); default is the sprite's own blue.
+    DynamicLabel: '#215FEB',
   // Per Atrius's badge guide: parent-category badge colors, shared by subcategories. The web SDK
   // doesn't apply them to its own icons, so the studio previews them (see "category badge preview").
-  }).map(([k, v]) => ['categoryBadge' + k, [v, 'Badge · map badges, list & POI icons']])) },
+  }).map(([k, v]) => ['categoryBadge' + k, [v, k === 'DynamicLabel'
+    ? 'Terminal / concourse tags · studio preview'
+    : 'Badge · map badges, list & POI icons']])) },
 ]
-
-// The "List of all keys" block from the docs page — useful as a sanity preset.
-const DOCS_SAMPLE = {
-  primary: '#522981', primaryButton: '#8559A6', primaryButtonText: '#FFFFFF', primaryButtonHover: '#722FA5',
-  secondary: '#999999', secondaryButton: '#EEEEEE', secondaryButtonText: '#8559A6', secondaryButtonHover: '#D9D9D9',
-  errorState: '#E52727', primaryText: '#333333', secondaryText: '#666666', background: '#FFFFFF',
-  toolTipBackground: '#000000', toolTipText: '#FFFFFF', mapNavBackground: '#522981', mapNavText: '#FFFFFF',
-  mapNavSearchResults: '#9F147B', mapNavSearchResultsText: '#FFFFFF', widgetBackground: '#F9F9F9',
-  widgetIconFill: '#522981', widgetText: '#522981', statusOpenBackground: '#219653', statusOpenText: '#FFFFFF',
-  statusClosedBackground: '#EBEBEB', statusClosedText: '#333333', statusEarlyBackground: '#0088DD',
-  statusEarlyText: '#FFFFFF', statusDelayedBackground: '#CA4800', statusDelayedText: '#FFFFFF',
-  statusCancelledBackground: '#E52727', statusCancelledText: '#FFFFFF',
-}
 
 const DEFAULTS = {}, META = {}
 for (const g of GROUPS) for (const [k, [def, desc, pair]] of Object.entries(g.keys)) {
@@ -415,7 +409,7 @@ for (const g of GROUPS) for (const [k, [def, desc, pair]] of Object.entries(g.ke
 
 /* ---------------- state ---------------- */
 const STORE = 'atrius-theme-studio-v1'
-const state = { overrides: {}, venueId: 'lax', accountId: 'A11F4Y6SZRXH4X', flightStatus: true, placeColors: {}, autoApply: false, badgePreview: true }
+const state = { overrides: {}, venueId: 'lax', accountId: 'A11F4Y6SZRXH4X', flightStatus: true, placeColors: {}, autoApply: false, badgePreview: true, sdkFixes: true }
 
 // Setting poiCategories replaces the SDK's default shortcuts, so keep those and prepend Flight Status.
 const FLIGHT_CATEGORIES = [
@@ -428,11 +422,13 @@ const FLIGHT_CATEGORIES = [
 ]
 // Studio starting point for dark-mode UI colors (Atrius publishes no web dark palette).
 const DARK_DEFAULTS = { ...DEFAULTS,
-  primary: '#5B9BFF', primaryButton: '#2F6FE4', primaryButtonText: '#FFFFFF', primaryButtonHover: '#255BC0',
+  // primaryButton doubles as tag-chip text on the panel, and the building selector draws primaryButtonText
+  // on mapNavBackground: light button, dark text, light nav.
+  primary: '#8DB6FF', primaryButton: '#8DB6FF', primaryButtonText: '#1C1E23', primaryButtonHover: '#B9D2FF',
   secondary: '#C8CBD2', secondaryButton: '#2E3138', secondaryButtonText: '#8DB6FF', secondaryButtonHover: '#3A3E47',
   primaryText: '#F1F2F4', secondaryText: '#A7ABB4', background: '#1C1E23', errorState: '#FF6B6B',
   toolTipBackground: '#F1F2F4', toolTipText: '#1C1E23',
-  mapNavBackground: '#2A2D34', mapNavText: '#FFFFFF', mapNavSearchResults: '#B5560F', mapNavSearchResultsText: '#FFFFFF',
+  mapNavBackground: '#C8CBD2', mapNavText: '#1C1E23', mapNavSearchResults: '#B5560F', mapNavSearchResultsText: '#FFFFFF',
   widgetBackground: '#25282E', widgetIconFill: '#E6E8EC', widgetText: '#E6E8EC', widgetIcons: '#E6E8EC',
   statusClosedBackground: '#3A3E47', statusClosedText: '#E6E8EC',
   statusInactiveBackground: '#3A3E47', statusInactiveText: '#E6E8EC',
@@ -472,92 +468,248 @@ const PLACE_GROUPS = [
   ]],
 ]
 
-/* United preset — built only from United's brand palette ("united colors.txt").
-   A bluish map in both modes: light = mid-navy tarmac with pale concourses,
-   dark = deep navy. Each mode gets its own UI palette and badge colors. */
-const U = {
-  unitedBlue: '#1414D2', unitedBlue35Black: '#0D0D8F', darkBlue: '#051464', mediumBlue: '#276EF1',
-  darkPurple: '#551E5F', mediumPurple: '#695FE6', mediumGreen22Black: '#46A46D', white: '#FFFFFF',
-  darkGrey: '#242424', mediumGrey: '#555555', lightGrey: '#878787', lightGrey75: '#A5A5A5', tonalGrey50: '#EBEBE9',
-  darkModeGrey: '#121212', vengeanceGrey: '#DEDEDE',
-  alertLight: { green: '#1B7742', red: '#D50032', yellow: '#FFC658' },
-  alertDark: { green: '#83DDA9', red: '#F87878', yellow: '#FFDC8C', blue: '#93B7F8' },
-  blue75: '#5D92F5', blue50: '#93B7F8', blue25: '#C9DBFC', blue15: '#DFE9FD',
-  purple75: '#8E87EC', purple50: '#B4AFF3', purple15: '#E9E7FB', darkPurple75: '#805687',
-  navy75: '#444F8B', navy50: '#8289B1', navy25: '#C0C4D8', navy15: '#DADCE8', // darkBlue opacity steps
+/* FlightAware Blue preset — colors picked from the FlightAware map reference (Figma
+   "Map_FlightAware"). Reference colors are used as-is; shades the reference doesn't name
+   (runways, walls, dark mode) are blends of those navies. System colors — flight
+   statuses, errors, destructive actions, security, exits, wayfinding — are left at their
+   defaults so they stay distinguishable. Labels: white text on a navy halo. */
+const FA = {
+  road: '#0B294E', tarmac: '#304971', concourse: '#2461A7', concourseTag: '#0072EA',
+  restaurant: '#5887B9', restaurantBadge: '#00458E', shop: '#71A5DC', shopBadge: '#0068D5',
+  gateLabel: '#0072EA', restroomBadge: '#002348', other: '#878787', utilityBadge: '#878787',
+  lightBlue: '#A5EBFF', white: '#FFFFFF',
+  // derived blends
+  runway: '#1E3960', wall: '#1B4C85', curb: '#4A6694',
+  darkTarmac: '#0A1E3A', darkRunway: '#071730', darkFloor: '#1B4C85', darkWall: '#16406F', darkTransit: '#3B5A86',
+  darkRestaurant: '#3D6A99', darkShop: '#3F6FA3', darkOther: '#56606E', darkHalo: '#061426',
 }
-// Every categoryBadge key: named ones get their color, the rest the "other" grey.
-const unitedBadges = (named, other) => Object.fromEntries(Object.keys(DEFAULTS)
-  .filter(k => k.startsWith('categoryBadge') && k !== 'categoryBadgeInactive')
+// Badges that carry system meaning keep their defaults; everything else is set.
+const SYSTEM_BADGES = new Set(['Security', 'Exit', 'Wayfinding', 'Inactive'])
+const faBadges = (named, other) => Object.fromEntries(Object.keys(DEFAULTS)
+  .filter(k => k.startsWith('categoryBadge') && !SYSTEM_BADGES.has(k.slice('categoryBadge'.length)))
   .map(k => [k, named[k.slice('categoryBadge'.length)] || other]))
 
-const UNITED = {
-  ui: {
-    light: {
-      primary: U.unitedBlue, primaryButton: U.unitedBlue, primaryButtonText: U.white, primaryButtonHover: U.unitedBlue35Black,
-      secondary: U.darkBlue, secondaryButton: U.blue15, secondaryButtonText: U.unitedBlue, secondaryButtonHover: U.blue25,
-      primaryText: U.darkGrey, secondaryText: U.mediumGrey, background: U.white, errorState: U.alertLight.red,
-      toolTipBackground: U.darkBlue, toolTipText: U.white,
-      mapNavBackground: U.darkBlue, mapNavText: U.white, mapNavSearchResults: U.unitedBlue, mapNavSearchResultsText: U.white,
-      widgetBackground: U.white, widgetIconFill: U.unitedBlue, widgetText: U.darkBlue, widgetIcons: U.unitedBlue,
-      statusOpenBackground: U.alertLight.green, statusOpenText: U.white,
-      statusClosedBackground: U.tonalGrey50, statusClosedText: U.darkGrey,
-      statusEarlyBackground: U.unitedBlue, statusEarlyText: U.white,
-      statusDelayedBackground: U.alertLight.yellow, statusDelayedText: U.darkGrey,
-      statusCancelledBackground: U.alertLight.red, statusCancelledText: U.white,
-      destructiveButton: U.alertLight.red, focusOutlineColor: U.mediumBlue, modHeaderBackground: U.darkBlue,
-      myLocationPrimaryButton: U.unitedBlue, myLocationPrimaryButtonHover: U.unitedBlue35Black,
-      statusAlertBackground: U.alertLight.red, statusActiveBackground: U.alertLight.green, statusInfoBackground: U.unitedBlue,
-      statusWarningBackground: U.alertLight.yellow, statusWarningText: U.darkGrey,
-      statusSuccessBackground: U.alertLight.green, statusErrorBackground: U.alertLight.red,
-      miscBadgePinColor: U.unitedBlue, miscBadgePinStroke: U.unitedBlue35Black,
-      ...unitedBadges({ Eat: U.mediumBlue, Shop: U.mediumPurple, Restroom: U.unitedBlue35Black, Gate: U.unitedBlue,
-        Relax: U.darkPurple, Security: U.alertLight.red, Exit: U.mediumGreen22Black, Wayfinding: U.unitedBlue }, U.lightGrey),
-    },
-    dark: {
-      primary: U.blue50, primaryButton: U.unitedBlue, primaryButtonText: U.white, primaryButtonHover: U.mediumBlue,
-      secondary: U.vengeanceGrey, secondaryButton: U.darkGrey, secondaryButtonText: U.blue50, secondaryButtonHover: U.mediumGrey,
-      primaryText: U.vengeanceGrey, secondaryText: U.lightGrey75, background: U.darkModeGrey, errorState: U.alertDark.red,
-      toolTipBackground: U.vengeanceGrey, toolTipText: U.darkModeGrey,
-      mapNavBackground: U.darkBlue, mapNavText: U.white, mapNavSearchResults: U.unitedBlue, mapNavSearchResultsText: U.white,
-      widgetBackground: U.darkGrey, widgetIconFill: U.blue50, widgetText: U.vengeanceGrey, widgetIcons: U.blue50,
-      statusOpenBackground: U.alertDark.green, statusOpenText: U.darkModeGrey,
-      statusClosedBackground: U.mediumGrey, statusClosedText: U.vengeanceGrey,
-      statusEarlyBackground: U.alertDark.blue, statusEarlyText: U.darkModeGrey,
-      statusDelayedBackground: U.alertDark.yellow, statusDelayedText: U.darkModeGrey,
-      statusCancelledBackground: U.alertDark.red, statusCancelledText: U.darkModeGrey,
-      destructiveButton: U.alertLight.red, focusOutlineColor: U.blue50, modHeaderBackground: U.darkBlue,
-      myLocationPrimaryButton: U.mediumBlue, myLocationPrimaryButtonHover: U.blue75,
-      statusAlertBackground: U.alertDark.red, statusAlertText: U.darkModeGrey,
-      statusActiveBackground: U.alertDark.green, statusActiveText: U.darkModeGrey,
-      statusInfoBackground: U.alertDark.blue, statusInfoText: U.darkModeGrey,
-      statusWarningBackground: U.alertDark.yellow, statusWarningText: U.darkModeGrey,
-      statusInactiveBackground: U.mediumGrey, statusInactiveText: U.vengeanceGrey,
-      statusSuccessBackground: U.alertDark.green, statusSuccessText: U.darkModeGrey,
-      statusErrorBackground: U.alertDark.red, statusErrorText: U.darkModeGrey,
-      miscBadgePinColor: U.mediumBlue, miscBadgePinStroke: U.blue50,
-      ...unitedBadges({ Eat: U.blue75, Shop: U.purple75, Restroom: U.navy75, Gate: U.mediumBlue,
-        Relax: U.darkPurple75, Security: U.alertLight.red, Exit: U.mediumGreen22Black, Wayfinding: U.mediumBlue }, U.mediumGrey),
-    },
+const FA_OTHER_PLACES = ['restroom', 'services', 'relax', 'gate', 'checkin', 'ticketing', 'baggage', 'transport', 'parking', 'art']
+const FLIGHTAWARE = {
+  light: {
+    // primary = flight-toggle text on a 10% text tint; primaryButton at 85% backs white counter text.
+    primary: FA.restaurantBadge, primaryButton: FA.restaurantBadge, primaryButtonText: FA.white, primaryButtonHover: FA.restroomBadge,
+    secondary: FA.road, secondaryButton: '#E6F1FD', secondaryButtonText: FA.restaurantBadge, secondaryButtonHover: '#CCE3FB',
+    primaryText: FA.road, secondaryText: '#4B5E78', background: FA.white,
+    toolTipBackground: FA.road, toolTipText: FA.white,
+    mapNavBackground: FA.road, mapNavText: FA.white, mapNavSearchResults: FA.shopBadge, mapNavSearchResultsText: FA.white,
+    // widgetIconFill is also flight-toggle text on a 10% widgetText tint, and the active toggle's fill.
+    widgetBackground: FA.white, widgetIconFill: FA.restaurantBadge, widgetText: FA.road, widgetIcons: FA.restaurantBadge,
+    focusOutlineColor: FA.concourseTag, modHeaderBackground: FA.road, modHeaderText: FA.white,
+    myLocationPrimaryButton: FA.shopBadge, myLocationPrimaryButtonHover: FA.restaurantBadge,
+    miscBadgePinColor: FA.concourseTag, miscBadgePinStroke: FA.restaurantBadge,
+    ...faBadges({ Eat: FA.restaurantBadge, Shop: FA.shopBadge, Restroom: FA.restroomBadge, Gate: FA.gateLabel,
+      DynamicLabel: FA.concourseTag }, FA.utilityBadge),
   },
-  // Venue map file fills: [light fillColor, dark darkFillColor]
+  dark: {
+    // primaryButton doubles as tag-chip text on the panel, so dark mode uses a light button with dark text.
+    primary: '#8CC4FF', primaryButton: '#4DA3FF', primaryButtonText: '#0B1A2E', primaryButtonHover: '#8CC4FF',
+    secondary: '#C9D6E6', secondaryButton: '#1B3558', secondaryButtonText: '#8CC4FF', secondaryButtonHover: '#24426B',
+    primaryText: '#E8EEF6', secondaryText: '#A9B8CC', background: '#0B1A2E',
+    toolTipBackground: '#E8EEF6', toolTipText: '#0B1A2E',
+    // The building/level selector draws dark text on mapNavBackground, so dark mode uses a light nav.
+    mapNavBackground: '#8CC4FF', mapNavText: '#0B1A2E', mapNavSearchResults: FA.shopBadge, mapNavSearchResultsText: FA.white,
+    widgetBackground: '#13294A', widgetIconFill: '#8CC4FF', widgetText: '#E8EEF6', widgetIcons: '#8CC4FF',
+    focusOutlineColor: FA.lightBlue, modHeaderBackground: FA.road, modHeaderText: FA.white,
+    myLocationPrimaryButton: FA.shopBadge, myLocationPrimaryButtonHover: FA.concourseTag,
+    miscBadgePinColor: '#4DA3FF', miscBadgePinStroke: FA.concourseTag,
+    ...faBadges({ Eat: '#1F5FA8', Shop: FA.shopBadge, Restroom: '#2A4F80', Gate: FA.gateLabel,
+      DynamicLabel: FA.concourseTag }, '#6B7480'),
+  },
+  // Venue map fills: [light fillColor, dark darkFillColor]. Security, inactive and unoccupied keep defaults.
   places: {
-    'basemap.venue': [U.navy75, U.darkBlue], 'basemap.outdoor': [U.navy75, U.darkBlue],
-    'basemap.runway': [U.unitedBlue35Black, U.unitedBlue35Black], 'basemap.road': [U.darkBlue, U.navy75],
-    'basemap.curb': [U.navy50, U.navy75], 'basemap.jetway': [U.navy50, U.navy75], 'basemap.transitline': [U.navy25, U.navy50],
-    'element.building': [U.navy50, U.unitedBlue35Black],
-    'element.presecurity': [U.navy25, U.navy75], 'element.postsecurity': [U.navy25, U.navy75],
-    'element.wall': [U.navy50, U.navy50], 'element.opentobelow': [U.navy15, U.darkBlue],
-    'element.nonaccessible': [U.navy50, U.unitedBlue35Black],
-    eat: [U.blue15, U.blue50], shop: [U.purple15, U.purple50],
-    ...Object.fromEntries(['restroom', 'services', 'relax', 'gate', 'security', 'checkin', 'ticketing', 'baggage',
-      'transport', 'parking', 'art'].map(f => [f, [U.navy15, U.navy50]])),
+    'basemap.venue': [FA.tarmac, FA.darkTarmac], 'basemap.outdoor': [FA.tarmac, FA.darkTarmac],
+    'basemap.runway': [FA.runway, FA.darkRunway], 'basemap.road': [FA.road, FA.tarmac],
+    'basemap.curb': [FA.curb, FA.darkWall], 'basemap.jetway': [FA.wall, FA.darkWall], 'basemap.transitline': [FA.curb, FA.darkTransit],
+    'element.building': [FA.concourse, FA.darkFloor],
+    'element.presecurity': [FA.concourse, FA.darkFloor], 'element.postsecurity': [FA.concourse, FA.darkFloor],
+    'element.wall': [FA.wall, FA.darkWall], 'element.opentobelow': [FA.tarmac, FA.darkTarmac],
+    'element.nonaccessible': [FA.wall, FA.darkWall],
+    eat: [FA.restaurant, FA.darkRestaurant], shop: [FA.shop, FA.darkShop],
+    ...Object.fromEntries(FA_OTHER_PLACES.map(f => [f, [FA.other, FA.darkOther]])),
+  },
+  // Place, map and terminal labels: white text with a navy halo in both modes.
+  labels: Object.fromEntries(['eat', 'shop', 'security', ...FA_OTHER_PLACES, 'label', 'dynamicLabel']
+    .map(f => [f, { textColor: FA.white, haloColor: FA.road, darkTextColor: FA.white, darkHaloColor: FA.darkHalo }])),
+  labelsAll: { textColor: FA.white, haloColor: FA.road, darkTextColor: FA.white, darkHaloColor: FA.darkHalo },
+  // POI-dot label paint is hard-coded in Atrius's map style: previewed here, exported for Atrius.
+  mapStyle: {
+    light: { 'p1 - poi dot': { 'text-halo-color': FA.road }, 'p2 - poi dot': { 'text-color': FA.white, 'text-halo-color': FA.road }, 'p3 - poi dot': { 'text-color': FA.white, 'text-halo-color': FA.road } },
+    dark: { 'p1 - poi dot': { 'text-halo-color': FA.darkHalo }, 'p2 - poi dot': { 'text-color': FA.white, 'text-halo-color': FA.darkHalo }, 'p3 - poi dot': { 'text-color': FA.white, 'text-halo-color': FA.darkHalo } },
+  },
+}
+/* United Blue preset — reference: Figma "Map_UnitedBlue"; every color comes from the United
+   color library (Atmos "United_colors"). Where the reference's own label colors fall below
+   4.5:1 on their fills, a darker library color of the same family is used instead. System
+   colors (statuses, errors, security, exit, wayfinding) stay at their defaults. */
+const UB = {
+  unitedBlue: '#1414D2', unitedBlue35Black: '#0D0D8F', darkBlue: '#051464', mediumBlue: '#276EF1',
+  lightBlue: '#A4EBFF', darkPurple: '#551E5F', mediumPurple: '#695FE6', white: '#FFFFFF',
+  darkGrey: '#242424', mediumGrey: '#555555', lightGrey: '#878787', lightGrey75: '#A5A5A5',
+  megaDarkGrey: '#121212', vengeanceGrey: '#DEDEDE',
+  blue50: '#93B7F8', blue25: '#C9DBFC', blue15: '#DFE9FD', purple15: '#E9E7FB', // Medium Blue / Purple opacity steps
+  navy75: '#444F8B', navy50: '#8289B1', navy25: '#C0C4D8',                         // Dark Blue opacity steps
+}
+// United color library (Figma "United_colors"): Primary, Opacity, Alerts, Grey Scale and dark-mode
+// additions. Membership / boarding-pass / Star Alliance colors are excluded from automatic mapping
+// because the library reserves them for those uses.
+const UNITED_LIBRARY = [
+  '#1414D2', '#0D0D8F', '#051464', '#276EF1', '#A4EBFF', '#551E5F', '#695FE6', '#D7D2FF', '#FF4B4B', '#FFBEB9',
+  '#FFE6DC', '#7D283C', '#D7AAAA', '#FADCE1', '#686E28', '#FFDC8C', '#FFF0D7', '#2D4637', '#5AD28C', '#46A46D',
+  '#DCFAE6', '#F7F4F2', '#FFFFFF', '#000000',
+  '#1B7742', '#D50032', '#FFC658', '#5D92F5', '#FF8753',
+  '#242424', '#555555', '#B7B7B7', '#878787', '#A5A5A5', '#D7D7D4', '#EBEBE9', '#F5F5F4', '#121212', '#DEDEDE',
+  '#5D92F5', '#93B7F8', '#C9DBFC', '#DFE9FD', '#F4F8FE', '#8E87EC', '#B4AFF3', '#DAD7F9', '#E9E7FB', '#F8F7FE',
+  '#E1BFBF', '#EBD4D4', '#F5EAEA', '#F9F2F2', '#FDFBFB', '#FFCECA', '#FFDFDC', '#FFEFEE', '#FFF5F5', '#FFFCFC',
+  '#83DDA9', '#ADE9C5', '#D6F4E2', '#E6F8EE', '#F7FDF9', '#FFE5A9', '#FFEEC5', '#FFF6E2', '#FFFAEE', '#FFFDF9',
+  '#FFF9F6', '#805687', '#AA8EAF', '#D4C7D7', '#E6DDE7', '#F6F4F7', '#FF7676', '#FFA3A3', '#FFD1D1', '#FFE4E4',
+  '#FFF6F6', '#9D5E6D', '#BE939D', '#DEC9CE', '#ECDFE2', '#F8F4F5', '#8E925E', '#B3B693', '#D9DBC9', '#E8E9DF',
+  '#F7F8F4', '#627469', '#96A29B', '#CAD1CD', '#E0E3E1', '#F4F6F5', '#444F8B', '#8289B1', '#C0C4D8', '#DADCE8', '#F2F3F7',
+]
+// Closest palette color by CIELAB distance.
+const toLab = hex => {
+  const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
+    .map(v => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)
+  const f = t => t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116
+  const x = f((r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047), y = f(r * 0.2126 + g * 0.7152 + b * 0.0722)
+  const z = f((r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883)
+  return [116 * y - 16, 500 * (x - y), 200 * (y - z)]
+}
+const nearestColor = (hex, palette) => {
+  const a = toLab(hex)
+  let best = palette[0], bestD = Infinity
+  for (const c of palette) {
+    const b = toLab(c), d = (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2
+    if (d < bestD) { bestD = d; best = c }
+  }
+  return best
+}
+// United Alerts / Grey Scale colors used for system states.
+const UA = {
+  alertGreen: '#1B7742', alertRed: '#D50032', alertYellow: '#FFC658', alertBlue: '#276EF1',
+  darkAlertGreen: '#5AD28C', darkAlertRed: '#FF4B4B', darkAlertBlue: '#5D92F5', darkRed75: '#FF7676',
+  darkBurgundy: '#7D283C', mediumRed: '#FFBEB9', mediumGreen22Black: '#46A46D', darkPurple75: '#805687',
+  tonalGrey: '#D7D7D4', tonalGrey50: '#EBEBE9', darkTonalGrey: '#B7B7B7', black: '#000000',
+}
+const UNITED_BLUE = {
+  light: {
+    primary: UB.unitedBlue, primaryButton: UB.unitedBlue, primaryButtonText: UB.white, primaryButtonHover: UB.unitedBlue35Black,
+    secondary: UB.darkBlue, secondaryButton: UB.blue15, secondaryButtonText: UB.unitedBlue, secondaryButtonHover: UB.blue25,
+    primaryText: UB.darkGrey, secondaryText: UB.mediumGrey, background: UB.white,
+    toolTipBackground: UB.darkBlue, toolTipText: UB.white,
+    mapNavBackground: UB.darkBlue, mapNavText: UB.white, mapNavSearchResults: UB.unitedBlue, mapNavSearchResultsText: UB.white,
+    widgetBackground: UB.white, widgetIconFill: UB.unitedBlue, widgetText: UB.darkBlue, widgetIcons: UB.unitedBlue,
+    focusOutlineColor: UB.mediumBlue, modHeaderBackground: UB.darkBlue, modHeaderText: UB.white,
+    myLocationPrimaryButton: UB.unitedBlue, myLocationPrimaryButtonHover: UB.unitedBlue35Black,
+    miscBadgePinColor: UB.unitedBlue, miscBadgePinStroke: UB.unitedBlue35Black,
+    ...faBadges({ Eat: UB.mediumBlue, Shop: UB.mediumPurple, Restroom: UB.darkBlue, Gate: UB.unitedBlue,
+      DynamicLabel: UB.unitedBlue35Black }, UB.lightGrey),
+    // System states — United Alerts + Grey Scale
+    errorState: UA.alertRed,
+    statusOpenBackground: UA.alertGreen, statusOpenText: UB.white,
+    statusClosedBackground: UA.tonalGrey50, statusClosedText: UB.darkGrey,
+    statusEarlyBackground: UA.alertBlue, statusEarlyText: UB.white,
+    statusDelayedBackground: UA.alertYellow, statusDelayedText: UB.darkGrey,
+    statusCancelledBackground: UA.alertRed, statusCancelledText: UB.white,
+    statusAlertBackground: UA.alertRed, statusAlertText: UB.white,
+    statusActiveBackground: UA.alertGreen, statusActiveText: UB.white,
+    statusInfoBackground: UA.alertBlue, statusInfoText: UB.white,
+    statusWarningBackground: UA.alertYellow, statusWarningText: UB.darkGrey,
+    statusInactiveBackground: UA.tonalGrey50, statusInactiveText: UB.darkGrey,
+    statusSuccessBackground: UA.alertGreen, statusSuccessText: UB.white,
+    statusErrorBackground: UA.alertRed, statusErrorText: UB.white,
+    destructiveButton: UA.alertRed, destructiveButtonHover: UA.darkBurgundy,
+    destructiveButtonText: UB.white, destructiveButtonHoverText: UB.white,
+    myLocationSecondaryButton: UB.mediumGrey, myLocationSecondaryButtonHover: UB.darkGrey,
+    adminMarkerText: UB.darkBlue, programmaticPinMarkersText: UB.darkBlue,
+    miscBadgeDynamicLabelColor: UB.unitedBlue, miscSelectedbgStroke: UA.tonalGrey,
+    miscWayfindingStartColor: UB.darkBlue, miscWayfindingStartStroke: UA.black,
+    miscWayfindingStartGhostColor: UA.darkTonalGrey, miscWayfindingStartGhostStroke: UB.mediumGrey,
+    categoryBadgeSecurity: UA.alertRed, categoryBadgeExit: UA.alertGreen,
+    categoryBadgeInactive: UB.lightGrey, categoryBadgeWayfinding: UB.darkPurple,
+  },
+  dark: {
+    // primaryButton doubles as tag-chip text on the panel: light button, dark text.
+    primary: UB.blue50, primaryButton: UB.blue50, primaryButtonText: UB.megaDarkGrey, primaryButtonHover: UB.blue25,
+    secondary: UB.vengeanceGrey, secondaryButton: UB.darkGrey, secondaryButtonText: UB.blue50, secondaryButtonHover: UB.darkBlue,
+    primaryText: UB.vengeanceGrey, secondaryText: UB.lightGrey75, background: UB.megaDarkGrey,
+    toolTipBackground: UB.vengeanceGrey, toolTipText: UB.megaDarkGrey,
+    // The building/level selector draws dark text on mapNavBackground, so dark mode uses a light nav.
+    mapNavBackground: UB.blue50, mapNavText: UB.megaDarkGrey, mapNavSearchResults: UB.unitedBlue, mapNavSearchResultsText: UB.white,
+    widgetBackground: UB.darkGrey, widgetIconFill: UB.blue50, widgetText: UB.vengeanceGrey, widgetIcons: UB.blue50,
+    focusOutlineColor: UB.lightBlue, modHeaderBackground: UB.darkBlue, modHeaderText: UB.white,
+    myLocationPrimaryButton: UB.unitedBlue, myLocationPrimaryButtonHover: UB.unitedBlue35Black,
+    miscBadgePinColor: UB.blue50, miscBadgePinStroke: UB.mediumBlue,
+    ...faBadges({ Eat: UB.mediumBlue, Shop: UB.mediumPurple, Restroom: UB.navy75, Gate: UB.unitedBlue,
+      DynamicLabel: UB.mediumBlue }, UB.mediumGrey),
+    // System states — United dark-mode Alerts + Grey Scale
+    errorState: UA.darkAlertRed,
+    statusOpenBackground: UA.darkAlertGreen, statusOpenText: UB.megaDarkGrey,
+    statusClosedBackground: UB.mediumGrey, statusClosedText: UB.vengeanceGrey,
+    statusEarlyBackground: UA.darkAlertBlue, statusEarlyText: UB.megaDarkGrey,
+    statusDelayedBackground: UA.alertYellow, statusDelayedText: UB.megaDarkGrey,
+    statusCancelledBackground: UA.darkAlertRed, statusCancelledText: UB.megaDarkGrey,
+    statusAlertBackground: UA.darkAlertRed, statusAlertText: UB.megaDarkGrey,
+    statusActiveBackground: UA.darkAlertGreen, statusActiveText: UB.megaDarkGrey,
+    statusInfoBackground: UA.darkAlertBlue, statusInfoText: UB.megaDarkGrey,
+    statusWarningBackground: UA.alertYellow, statusWarningText: UB.megaDarkGrey,
+    statusInactiveBackground: UB.mediumGrey, statusInactiveText: UB.vengeanceGrey,
+    statusSuccessBackground: UA.darkAlertGreen, statusSuccessText: UB.megaDarkGrey,
+    statusErrorBackground: UA.darkAlertRed, statusErrorText: UB.megaDarkGrey,
+    destructiveButton: UA.darkAlertRed, destructiveButtonHover: UA.darkRed75,
+    destructiveButtonText: UB.megaDarkGrey, destructiveButtonHoverText: UB.megaDarkGrey,
+    myLocationSecondaryButton: UB.mediumGrey, myLocationSecondaryButtonHover: UB.darkGrey,
+    adminMarkerText: UB.darkBlue, programmaticPinMarkersText: UB.darkBlue,
+    miscBadgeDynamicLabelColor: UB.mediumBlue, miscSelectedbgStroke: UB.mediumGrey,
+    miscWayfindingStartColor: UB.vengeanceGrey, miscWayfindingStartStroke: UA.black,
+    miscWayfindingStartGhostColor: UB.mediumGrey, miscWayfindingStartGhostStroke: UB.lightGrey75,
+    categoryBadgeSecurity: UA.darkAlertRed, categoryBadgeExit: UA.mediumGreen22Black,
+    categoryBadgeInactive: UB.lightGrey, categoryBadgeWayfinding: UA.darkPurple75,
+  },
+  // Venue map fills: [light fillColor, dark darkFillColor]. Security, inactive and unoccupied keep defaults.
+  places: {
+    'basemap.venue': [UB.navy75, UB.darkBlue], 'basemap.outdoor': [UB.navy75, UB.darkBlue],
+    'basemap.runway': [UB.darkBlue, UB.unitedBlue35Black], 'basemap.road': [UB.darkBlue, UB.unitedBlue35Black],
+    'basemap.curb': [UB.navy25, UB.unitedBlue35Black], 'basemap.jetway': [UB.navy50, UB.navy75], 'basemap.transitline': [UB.navy25, UB.navy50],
+    'element.building': [UB.navy25, UB.unitedBlue35Black],
+    'element.presecurity': [UB.navy50, UB.navy75], 'element.postsecurity': [UB.navy50, UB.navy75],
+    'element.wall': [UB.navy25, UB.unitedBlue35Black], 'element.opentobelow': [UB.navy75, UB.darkBlue],
+    'element.nonaccessible': [UB.navy25, UB.unitedBlue35Black],
+    eat: [UB.blue15, UB.mediumBlue], shop: [UB.purple15, UB.mediumPurple],
+    ...Object.fromEntries(FA_OTHER_PLACES.map(f => [f, [UB.navy25, UB.darkGrey]])),
+    security: [UA.mediumRed, UA.darkBurgundy],
+    inactive: [UB.lightGrey75, UB.mediumGrey], unoccupied: [UB.lightGrey75, UB.mediumGrey],
+  },
+  // Light: dark library text on a white halo (as in the reference). Dark: white text on a Dark Blue halo.
+  labels: {
+    eat: { textColor: UB.unitedBlue, haloColor: UB.white, darkTextColor: UB.white, darkHaloColor: UB.darkBlue },
+    shop: { textColor: UB.darkPurple, haloColor: UB.white, darkTextColor: UB.white, darkHaloColor: UB.darkBlue },
+    ...Object.fromEntries([...FA_OTHER_PLACES, 'label', 'dynamicLabel']
+      .map(f => [f, { textColor: UB.darkBlue, haloColor: UB.white, darkTextColor: UB.white, darkHaloColor: UB.darkBlue }])),
+    security: { textColor: UB.darkBlue, haloColor: UB.white, darkTextColor: UB.white, darkHaloColor: UB.darkBlue },
+    // Gate numbers sit on the United Blue gate sign (no halo): white text in both modes.
+    gate: { textColor: UB.white, haloColor: UB.unitedBlue, darkTextColor: UB.white, darkHaloColor: UB.unitedBlue },
+    ...Object.fromEntries(['inactive', 'unoccupied']
+      .map(f => [f, { textColor: UB.darkGrey, haloColor: UB.white, darkTextColor: UB.vengeanceGrey, darkHaloColor: UB.megaDarkGrey }])),
+  },
+  labelsAll: { textColor: UB.darkBlue, haloColor: UB.white, darkTextColor: UB.white, darkHaloColor: UB.darkBlue },
+  // Every remaining UI key and venue-file color is mapped to its closest library color on apply.
+  library: UNITED_LIBRARY,
+  // POI-dot labels are hard-coded #4d4563 in Atrius's map style (not theme.json): previewed here, exported for Atrius.
+  mapStyle: {
+    light: { 'p1 - poi dot': { 'text-halo-color': UB.white }, 'p2 - poi dot': { 'text-color': UB.darkBlue, 'text-halo-color': UB.white }, 'p3 - poi dot': { 'text-color': UB.darkBlue, 'text-halo-color': UB.white } },
+    dark: { 'p1 - poi dot': { 'text-halo-color': UB.darkBlue }, 'p2 - poi dot': { 'text-color': UB.white, 'text-halo-color': UB.darkBlue }, 'p3 - poi dot': { 'text-color': UB.white, 'text-halo-color': UB.darkBlue } },
   },
 }
 const FAMILY_KEYS = new Set(PLACE_GROUPS.flatMap(([, fams]) => fams.map(([k]) => k)))
 // Fill only: the venue style draws place shapes from fillColor and gives every polygon
 // a fixed black edge — strokeColor only reaches portal and parking-stall lines.
-const ALL_PLACE_ATTRS = ['fillColor', 'darkFillColor']
+const ALL_PLACE_ATTRS = ['fillColor', 'darkFillColor', 'textColor', 'haloColor', 'darkTextColor', 'darkHaloColor']
 const placeAttrs = () => state.mode === 'dark' ? ['darkFillColor'] : ['fillColor']
 const placeKey = () => `${state.accountId}/${state.venueId}`
 const placeEdits = () => (state.placeColors[placeKey()] ||= {})
@@ -602,7 +754,7 @@ function buildVenueTheme (theme, edits) {
     for (const k of Object.keys(theme)) {
       if (k !== fam && !k.startsWith(fam + '.')) continue
       for (const [attr, val] of Object.entries(attrs)) {
-        if (k === fam || theme[k][attr] === parent[attr]) out[k][attr] = val
+        if (k === fam || (theme[k][attr] === parent[attr] && edits[k]?.[attr] === undefined)) out[k][attr] = val
       }
     }
   }
@@ -629,7 +781,7 @@ async function renderPlaces () {
   for (const k in placeRows) delete placeRows[k]
   host.innerHTML = `<div class="tier" id="placeTier">Map place colors · venue file</div>
     <div class="tier-note">Per category: shape fill (from Atrius’s map file for this venue) and badge color (its categoryBadge key — per Atrius’s badge guide, subcategories share the parent’s badge color). Preview only — export and send to Atrius to apply.</div>
-    <label class="switch badge-toggle"><input type="checkbox" id="badgePreview"><span>Preview badge colors</span><em>map badges · list &amp; POI icons</em></label>`
+    <label class="switch badge-toggle"><input type="checkbox" id="badgePreview"><span>Preview badge colors</span><em>map badges · dots · list &amp; POI icons</em></label>`
   const bp = host.querySelector('#badgePreview')
   bp.checked = state.badgePreview !== false
   bp.addEventListener('change', () => { state.badgePreview = bp.checked; save(); applyBadgePreview() })
@@ -680,7 +832,9 @@ function buildPlaceRow (fam, label) {
   hex.addEventListener('blur', () => { hex.classList.remove('invalid'); syncPlaceRow(fam) })
   hex.addEventListener('keydown', e => { if (e.key === 'Enter') hex.blur() })
   row.querySelector('.reset').addEventListener('click', () => {
-    for (const a of placeAttrs()) setPlaceRaw(fam, a, null)
+    const textAttrs = state.mode === 'dark' ? ['darkTextColor', 'darkHaloColor'] : ['textColor', 'haloColor']
+    state.preset = null
+    for (const a of [...placeAttrs(), ...textAttrs]) setPlaceRaw(fam, a, null)
     if (hasBadge && badgeKey in state.overrides) setKey(badgeKey, null)
     syncPlaceRow(fam); syncChrome(); save(); scheduleApply()
   })
@@ -697,6 +851,7 @@ function setPlaceRaw (fam, attr, v) {
 }
 
 function setPlace (fam, idx, v, fromHex = false) {
+  state.preset = null
   setPlaceRaw(fam, placeAttrs()[idx], v)
   syncPlaceRow(fam, fromHex); syncChrome(); save(); scheduleApply()
 }
@@ -741,6 +896,7 @@ function mapExport (scope) {
       for (const attr in b) if (b[attr] !== a[attr]) (out[k] ||= {})[attr] = b[attr]
     }
   }
+  if (state.mapStyle) out = { ...out, _mapStyleOverrides: state.mapStyle } // map-style layer paint, not theme.json
   const json = JSON.stringify(out, null, 2)
   const header = scope === 'all'
     ? `// Full venue map theme (theme.json) for ${state.venueId}, with your edits\n`
@@ -762,7 +918,7 @@ let appliedBadges = {} // categoryBadge key → color, as of the last apply
 const badgeCat = key => key.slice('categoryBadge'.length).toLowerCase()
 const badgeKeyFor = name => { const top = name.split('.')[0]; return 'categoryBadge' + top.charAt(0).toUpperCase() + top.slice(1) }
 const snapshotBadges = () => {
-  appliedBadges = Object.fromEntries(Object.keys(DEFAULTS).filter(k => k.startsWith('categoryBadge')).map(k => [k, value(k)]))
+  appliedBadges = Object.fromEntries(Object.keys(DEFAULTS).filter(k => k.startsWith('categoryBadge') || k === 'miscBadgePinColor').map(k => [k, value(k)]))
 }
 
 // Most common opaque, non-white pixel = the badge's background color.
@@ -804,7 +960,9 @@ function applyMapBadges () {
   if (!ids.includes('eat') && !ids.includes('restroom')) return false // sprite not loaded yet
   const on = state.badgePreview !== false
   for (const id of ids) {
-    const key = badgeKeyFor(id)
+    // Location dots are sprites "dot.<category>" (Atrius spells one "dot.innactive"): use that category's badge color.
+    const key = id.startsWith('pin.') ? 'miscBadgePinColor'
+      : id.startsWith('dot.') ? badgeKeyFor(id.slice(4) === 'innactive' ? 'inactive' : id.slice(4)) : badgeKeyFor(id)
     const want = on && key in appliedBadges ? appliedBadges[key] : null
     if (!want && !spriteWritten.has(id)) continue
     const d = m.style.getImage(id)?.data
@@ -832,6 +990,25 @@ function recolorUiBadges () {
     if (!circle.dataset.atsFill) circle.dataset.atsFill = circle.getAttribute('fill')
     circle.setAttribute('fill', on ? appliedBadges[key] : circle.dataset.atsFill)
   }
+}
+
+// Paint overrides for map-style layers theme.json can't reach (e.g. POI-dot label text).
+function applyStyleOverrides () {
+  const layers = state.mapStyle?.[state.mode]
+  if (!layers) return
+  let tries = 0
+  const tick = () => {
+    const m = window._map
+    const ids = m?.getStyle ? m.getStyle().layers.map(l => l.id) : []
+    const matching = key => ids.filter(id => id === key || id.startsWith(key + '_'))
+    if (!Object.keys(layers).some(key => matching(key).length)) { if (++tries < 20) setTimeout(tick, 300); return }
+    for (const [key, props] of Object.entries(layers)) {
+      for (const id of matching(key)) {
+        for (const [prop, v] of Object.entries(props)) { try { m.setPaintProperty(id, prop, v) } catch {} }
+      }
+    }
+  }
+  tick()
 }
 
 function applyBadgePreview () {
@@ -946,7 +1123,20 @@ function syncRow (k, { skipHex = false } = {}) {
   if (k.startsWith('categoryBadge')) syncPlaceRow(badgeCat(k)) // keep the Places row's badge swatch in step
 }
 
+// The dropdown shows the preset in use. Editing a color, generating or importing clears it,
+// and the placeholder then reads "Custom" (or "Presets" when nothing has changed).
+function syncPresetSelect () {
+  const sel = document.getElementById('preset')
+  if (!sel) return
+  const key = state.preset && sel.querySelector(`option[value="${state.preset}"]`) ? state.preset : ''
+  const edited = Object.values(state.palettes || {}).some(p => Object.keys(p).length) ||
+    Object.values(state.placeColors || {}).some(v => Object.keys(v).length)
+  sel.options[0].textContent = edited ? 'Custom' : 'Presets'
+  sel.value = key
+}
+
 function syncChrome () {
+  syncPresetSelect()
   const n = Object.keys(state.overrides).length + Object.keys(placeEdits()).length
   $('#count').innerHTML = n ? `<b>${n}</b> changed` : 'defaults'
   for (const det of list.querySelectorAll('.group')) {
@@ -963,6 +1153,7 @@ function syncChrome () {
 function syncAll () { for (const k in rows) syncRow(k); syncPlaces(); syncChrome() }
 
 function setKey (k, v, { fromHex = false } = {}) {
+  state.preset = null
   const n = v == null ? null : normHex(v)
   if (n == null || n === def(k)) delete state.overrides[k]
   else state.overrides[k] = n
@@ -973,6 +1164,7 @@ function setKey (k, v, { fromHex = false } = {}) {
 }
 
 function setMany (obj, { replace = false } = {}) {
+  state.preset = null
   if (replace) state.overrides = state.palettes[state.mode] = {}
   for (const [k, v] of Object.entries(obj)) {
     if (!(k in DEFAULTS)) continue
@@ -1029,8 +1221,8 @@ $('#search').addEventListener('input', e => {
 // colors — so switching presets never leaves colors behind from the previous one.
 const PRESETS = {
   sdk: { light: {}, dark: {}, places: {} },
-  docs: { light: DOCS_SAMPLE, dark: {}, places: {} },
-  united: { light: UNITED.ui.light, dark: UNITED.ui.dark, places: UNITED.places },
+  flightaware: FLIGHTAWARE,
+  unitedblue: UNITED_BLUE,
 }
 // Apply a complete look { light, dark, places } — used by presets and the generator.
 function applyLook (p, label) {
@@ -1044,15 +1236,51 @@ function applyLook (p, label) {
   for (const [fam, [light, dark]] of Object.entries(p.places)) {
     setPlaceRaw(fam, 'fillColor', light); setPlaceRaw(fam, 'darkFillColor', dark)
   }
+  // Optional label colors: { family: { textColor, haloColor, darkTextColor, darkHaloColor } }
+  for (const [fam, attrs] of Object.entries(p.labels || {})) {
+    for (const [attr, v] of Object.entries(attrs)) setPlaceRaw(fam, attr, v)
+  }
+  // labelsAll: the same text/halo pair for every other entry that carries a label (portals, services,
+  // parking…). Without it, categories with no halo in the venue file draw bare text on the floor.
+  if (p.labelsAll && venue) {
+    const covered = k => Object.keys(p.labels || {}).some(f => k === f || k.startsWith(f + '.'))
+    for (const [k, e] of Object.entries(venue.theme)) {
+      if (!e || typeof e !== 'object' || !('textColor' in e) || covered(k)) continue
+      if (/^(basemap|element|nav|desaturation|overlay|opening)(\.|$)/.test(k)) continue
+      for (const [attr, v] of Object.entries(p.labelsAll)) setPlaceRaw(k, attr, v)
+    }
+  }
+  state.mapStyle = p.mapStyle || null
+  if (p.library) {
+    // Library-only look: anything still outside the library becomes its closest library color.
+    const lib = new Set(p.library)
+    const inLib = v => { const n = normHex(v); return !n || lib.has(n.slice(0, 7)) }
+    for (const [pal, defs] of [[state.palettes.light, DEFAULTS], [state.palettes.dark, DARK_DEFAULTS]]) {
+      for (const k of Object.keys(defs)) {
+        const v = pal[k] ?? defs[k]
+        if (!inLib(v)) pal[k] = nearestColor(normHex(v).slice(0, 7), p.library)
+      }
+    }
+    const built = buildVenueTheme(venue.theme, placeEdits())
+    for (const [k, attrs] of Object.entries(built)) {
+      if (!attrs || typeof attrs !== 'object') continue
+      for (const [attr, v] of Object.entries(attrs)) {
+        if (!/color/i.test(attr) || typeof v !== 'string' || inLib(v)) continue
+        setPlaceRaw(k, attr, nearestColor(normHex(v).slice(0, 7), p.library))
+      }
+    }
+  }
   syncAll(); save(); applyNow()
   toast(`${label} applied — light and dark`, 2500)
 }
 
 $('#preset').addEventListener('change', e => {
-  const p = PRESETS[e.target.value]
-  const label = e.target.selectedOptions[0]?.textContent
-  e.target.value = ''
-  if (p) applyLook(p, label)
+  const key = e.target.value
+  const p = PRESETS[key]
+  if (!p) { syncPresetSelect(); return }
+  state.preset = key
+  applyLook(p, e.target.selectedOptions[0]?.textContent)
+  syncPresetSelect()
 })
 
 /* ---------------- generate from one color ----------------
@@ -1081,6 +1309,8 @@ const withContrast = (h, s, l, bg, min = 4.5) => {
   for (let i = 0; i < 70 && contrast(c, bg) < min; i++) { l += dir * 1.5; c = hsl(h, s, l) }
   return c
 }
+// Blend a over b at opacity t (approximates the SDK's alpha tints over a solid panel).
+const mixHex = (a, b, t) => '#' + [1, 3, 5].map(i => Math.round(parseInt(a.slice(i, i + 2), 16) * t + parseInt(b.slice(i, i + 2), 16) * (1 - t)).toString(16).padStart(2, '0')).join('').toUpperCase()
 const hueToward = (h, target, amount) => h + ((((target - h) % 360) + 540) % 360 - 180) * amount
 
 function generateLook (seed, tone) {
@@ -1091,9 +1321,10 @@ function generateLook (seed, tone) {
 
   // ---- UI, light
   const L = {}
-  L.primary = withContrast(H, sat(1), 45, '#FFFFFF')
-  L.primaryButton = withContrast(H, sat(1), 42, '#FFFFFF')
-  L.primaryButtonHover = withContrast(H, sat(1), 32, '#FFFFFF', 7)
+  // primary is also flight-toggle text on a 10% primaryText tint; primaryButton at 85% backs white text.
+  L.primary = withContrast(H, sat(1), 45, mixHex(hsl(H, sat(0.2), 14), hsl(H, sat(0.3), 98), 0.1))
+  L.primaryButton = withContrast(H, sat(1), 42, '#FFFFFF', 6.5)
+  L.primaryButtonHover = withContrast(H, sat(1), 32, '#FFFFFF', 9)
   const navL = hsl(H, sat(0.5), 18), widgetBgL = hsl(H, sat(0.3), 98)
   Object.assign(L, {
     primaryButtonText: '#FFFFFF', secondary: hsl(H, sat(0.4), 25),
@@ -1113,21 +1344,23 @@ function generateLook (seed, tone) {
   // ---- UI, dark
   const bgD = hsl(H, sat(0.25), 8), panelD = hsl(H, sat(0.22), 14), textD = hsl(H, sat(0.1), 90)
   const D = {}
-  D.primary = withContrast(H, sat(0.9), 70, bgD)
-  D.primaryButton = withContrast(H, sat(1), 45, '#FFFFFF')
+  D.primary = withContrast(H, sat(0.9), 70, mixHex(textD, panelD, 0.1)) // also toggle text on the widget panel
+  // primaryButton is also tag-chip text on the panel: light button, dark text.
+  D.primaryButton = D.primary
+  const accentD = withContrast(H, sat(1), 45, '#FFFFFF') // dark accent that keeps white text
   Object.assign(D, {
-    primaryButtonText: '#FFFFFF', primaryButtonHover: hsl(H, sat(1), 55),
+    primaryButtonText: bgD, primaryButtonHover: hsl(H, sat(0.9), 80),
     secondary: hsl(H, sat(0.1), 85), secondaryButton: hsl(H, sat(0.25), 20), secondaryButtonHover: hsl(H, sat(0.25), 26),
     secondaryButtonText: withContrast(H, sat(0.9), 70, hsl(H, sat(0.25), 20)),
     primaryText: textD, secondaryText: withContrast(H, sat(0.1), 66, bgD), background: bgD,
     toolTipBackground: textD, toolTipText: bgD,
-    mapNavBackground: hsl(H, sat(0.5), 18), mapNavText: '#FFFFFF',
-    mapNavSearchResults: D.primaryButton, mapNavSearchResultsText: '#FFFFFF',
+    mapNavBackground: hsl(H, sat(0.9), 80), mapNavText: bgD, // selector rows use dark text on this
+    mapNavSearchResults: accentD, mapNavSearchResultsText: '#FFFFFF',
     widgetBackground: panelD, widgetIconFill: D.primary, widgetIcons: D.primary, widgetText: textD,
     focusOutlineColor: D.primary, modHeaderBackground: hsl(H, sat(0.5), 18),
     statusClosedBackground: hsl(H, sat(0.15), 30), statusClosedText: textD,
     statusInactiveBackground: hsl(H, sat(0.15), 30), statusInactiveText: textD,
-    myLocationPrimaryButton: D.primaryButton, myLocationPrimaryButtonHover: D.primaryButtonHover,
+    myLocationPrimaryButton: accentD, myLocationPrimaryButtonHover: hsl(H, sat(1), 55),
     miscBadgePinColor: D.primaryButton, miscBadgePinStroke: D.primary,
     statusEarlyBackground: D.primary, statusEarlyText: bgD, statusInfoBackground: D.primary, statusInfoText: bgD,
   })
@@ -1175,6 +1408,7 @@ genTone.value = state.genTone || 'bold'
 genChip.style.background = genColor.value
 genColor.addEventListener('input', () => { genChip.style.background = genColor.value })
 function runGenerator () {
+  state.preset = null
   const seed = normHex(genColor.value)
   state.genColor = seed; state.genTone = genTone.value
   applyLook(generateLook(seed, genTone.value), `Look from ${seed} (${genTone.value === 'bold' ? 'bold' : 'soft'} map)`)
@@ -1199,6 +1433,7 @@ $('#resetAll').addEventListener('click', () => {
       btn('Cancel', '', () => close()),
       btn('Reset', 'primary', () => {
         state.placeColors[placeKey()] = {}
+        state.mapStyle = null
         setMany({}, { replace: true })
         close(); toast('Reset to defaults')
       }),
@@ -1322,6 +1557,27 @@ document.querySelectorAll('#modeSeg button').forEach(b => b.addEventListener('cl
 }))
 syncMode()
 
+/* ---------------- SDK text contrast fixes ----------------
+   Some SDK text ignores the theme: styles hard-code #333333 / #666666 / #000000, which fail on dark
+   panels. The map renders in the host page (not an iframe), so host CSS can point these elements at
+   the theme's own variables. Selectors use the SDK's data-testid attributes, which are stable. */
+const SDK_FIX_CSS = `/* Atrius SDK: text with hard-coded colors -> theme colors (WCAG AA in light and dark) */
+.atrius-map [data-testid="PoiDescriptionText"] { color: var(--color-primaryText) !important; }
+.atrius-map [data-testid="PoiInformation"] a { color: var(--color-primary) !important; }
+.atrius-map [data-testid="APIErrorLabel"] { color: var(--color-primaryText) !important; }
+.atrius-map [data-testid="APIErrorContent"] { color: var(--color-secondaryText) !important; }
+.atrius-map [data-testid="MenuOption"] [data-testid="Text"] { color: var(--color-primaryText) !important; }
+`
+function syncSdkFixes () {
+  let el = document.getElementById('ats-sdk-fixes')
+  if (state.sdkFixes === false) { el?.remove(); return }
+  if (!el) { el = document.createElement('style'); el.id = 'ats-sdk-fixes'; document.head.append(el) }
+  el.textContent = SDK_FIX_CSS
+}
+$('#sdkFixToggle').checked = state.sdkFixes !== false
+$('#sdkFixToggle').addEventListener('change', e => { state.sdkFixes = e.target.checked; save(); syncSdkFixes() })
+syncSdkFixes()
+
 /* ---------------- flight status ---------------- */
 $('#flightToggle').checked = state.flightStatus
 $('#flightToggle').addEventListener('change', e => {
@@ -1425,6 +1681,7 @@ async function apply () {
       try { await darkenMap() } catch (err) { console.warn(err); status('error', 'Dark map toggle not found') }
     }
     applyBadgePreview() // the re-init reloaded the map's badge images and icons
+    applyStyleOverrides()
   } catch (e) {
     console.error(e)
     status('error', 'Error: ' + (e?.message || e))
@@ -1506,11 +1763,12 @@ $('#openCode').addEventListener('click', () => {
     s.sync = () => s.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === get()))
     return s
   }
-  const kindSeg = mkSeg([['ui', 'UI config'], ['map', 'Map colors']], () => kind, v => { kind = v })
+  const kindSeg = mkSeg([['ui', 'UI config'], ['map', 'Map colors'], ['css', 'Host CSS']], () => kind, v => { kind = v })
   const scopeSeg = mkSeg([['changed', 'Changed only'], ['all', 'All']], () => scope, v => { scope = v })
   segs.append(kindSeg, scopeSeg)
   const hint = document.createElement('span'); hint.className = 'hint'
   const payload = () => {
+    if (kind === 'css') return { text: SDK_FIX_CSS, json: SDK_FIX_CSS, file: 'atrius-sdk-contrast-fixes.css', type: 'text/css' }
     if (kind === 'map') return mapExport(scope)
     const colors = scope === 'all' ? Object.fromEntries(Object.keys(DEFAULTS).map(k => [k, value(k)])) : state.overrides
     return { text: codeFor(scope), json: JSON.stringify({ theme: { colors } }, null, 2), file: `atrius-theme-${state.venueId}-${state.mode}.json` }
@@ -1518,7 +1776,9 @@ $('#openCode').addEventListener('click', () => {
   const render = () => {
     kindSeg.sync(); scopeSeg.sync()
     pre.textContent = payload().text
-    hint.textContent = kind === 'ui' ? 'Paste into LMInit.newMap(…) config' : 'Send to the Atrius team (venue map theme)'
+    hint.textContent = kind === 'ui' ? 'Paste into LMInit.newMap(…) config'
+      : kind === 'css' ? 'Add to the page that embeds the map'
+      : 'Send to the Atrius team (venue map theme)'
   }
   render()
   const close = sheet({
@@ -1528,7 +1788,7 @@ $('#openCode').addEventListener('click', () => {
       btn('Download .json', '', () => {
         const p = payload()
         const a = document.createElement('a')
-        a.href = URL.createObjectURL(new Blob([p.json], { type: 'application/json' }))
+        a.href = URL.createObjectURL(new Blob([p.json], { type: p.type || 'application/json' }))
         a.download = p.file; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000)
       }),
       btn('Copy', 'primary', async () => {
@@ -1571,6 +1831,7 @@ $('#openImport').addEventListener('click', () => {
     for (const [, k, v] of ta.value.matchAll(/["']?([A-Za-z][\w]*)["']?\s*:\s*["']?(#[0-9a-fA-F]{3,8})\b/g)) found[k] = v
     const n = Object.keys(found).filter(k => k in DEFAULTS).length
     if (!n && !places) { toast('No recognised color keys found'); return }
+    state.preset = null
     if (n) setMany(found, { replace })
     else { syncAll(); save(); scheduleApply() }
     close()
