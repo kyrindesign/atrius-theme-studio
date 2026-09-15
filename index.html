@@ -504,7 +504,8 @@ const FLIGHTAWARE = {
     myLocationPrimaryButton: FA.shopBadge, myLocationPrimaryButtonHover: FA.restaurantBadge,
     miscBadgePinColor: FA.concourseTag, miscBadgePinStroke: FA.restaurantBadge,
     ...faBadges({ Eat: FA.restaurantBadge, Shop: FA.shopBadge, Restroom: FA.restroomBadge, Gate: FA.gateLabel,
-      DynamicLabel: FA.concourseTag }, FA.utilityBadge),
+      DynamicLabel: FA.concourseTag,
+      Relax: FA.concourse, Checkin: FA.tarmac /* Airlines */ }, FA.utilityBadge),
   },
   dark: {
     // primaryButton doubles as tag-chip text on the panel, so dark mode uses a light button with dark text.
@@ -519,7 +520,8 @@ const FLIGHTAWARE = {
     myLocationPrimaryButton: FA.shopBadge, myLocationPrimaryButtonHover: FA.concourseTag,
     miscBadgePinColor: '#4DA3FF', miscBadgePinStroke: FA.concourseTag,
     ...faBadges({ Eat: '#1F5FA8', Shop: FA.shopBadge, Restroom: '#2A4F80', Gate: FA.gateLabel,
-      DynamicLabel: FA.concourseTag }, '#6B7480'),
+      DynamicLabel: FA.concourseTag,
+      Relax: FA.darkShop, Checkin: FA.curb /* Airlines */ }, '#6B7480'),
   },
   // Venue map fills: [light fillColor, dark darkFillColor]. Security, inactive and unoccupied keep defaults.
   places: {
@@ -532,6 +534,7 @@ const FLIGHTAWARE = {
     'element.nonaccessible': [FA.wall, FA.darkWall],
     eat: [FA.restaurant, FA.darkRestaurant], shop: [FA.shop, FA.darkShop],
     ...Object.fromEntries(FA_OTHER_PLACES.map(f => [f, [FA.other, FA.darkOther]])),
+    relax: ['#8FB3DC', '#4F82B8'], checkin: ['#A3B7D1', '#6E8BB3'],
   },
   // Place, map and terminal labels: white text with a navy halo in both modes.
   labels: Object.fromEntries(['eat', 'shop', 'security', ...FA_OTHER_PLACES, 'label', 'dynamicLabel']
@@ -608,7 +611,8 @@ const UNITED_BLUE = {
     myLocationPrimaryButton: UB.unitedBlue, myLocationPrimaryButtonHover: UB.unitedBlue35Black,
     miscBadgePinColor: UB.unitedBlue, miscBadgePinStroke: UB.unitedBlue35Black,
     ...faBadges({ Eat: UB.mediumBlue, Shop: UB.mediumPurple, Restroom: UB.darkBlue, Gate: UB.unitedBlue,
-      DynamicLabel: UB.unitedBlue35Black }, UB.lightGrey),
+      DynamicLabel: UB.unitedBlue35Black,
+      Relax: '#5D92F5' /* Medium Blue 75% */, Checkin: UB.unitedBlue35Black /* Airlines */ }, UB.lightGrey),
     // System states — United Alerts + Grey Scale
     errorState: UA.alertRed,
     statusOpenBackground: UA.alertGreen, statusOpenText: UB.white,
@@ -646,7 +650,8 @@ const UNITED_BLUE = {
     myLocationPrimaryButton: UB.unitedBlue, myLocationPrimaryButtonHover: UB.unitedBlue35Black,
     miscBadgePinColor: UB.blue50, miscBadgePinStroke: UB.mediumBlue,
     ...faBadges({ Eat: UB.mediumBlue, Shop: UB.mediumPurple, Restroom: UB.navy75, Gate: UB.unitedBlue,
-      DynamicLabel: UB.mediumBlue }, UB.mediumGrey),
+      DynamicLabel: UB.mediumBlue,
+      Relax: '#5D92F5' /* Medium Blue 75% */, Checkin: UB.unitedBlue /* Airlines */ }, UB.mediumGrey),
     // System states — United dark-mode Alerts + Grey Scale
     errorState: UA.darkAlertRed,
     statusOpenBackground: UA.darkAlertGreen, statusOpenText: UB.megaDarkGrey,
@@ -682,6 +687,8 @@ const UNITED_BLUE = {
     'element.nonaccessible': [UB.navy25, UB.unitedBlue35Black],
     eat: [UB.blue15, UB.mediumBlue], shop: [UB.purple15, UB.mediumPurple],
     ...Object.fromEntries(FA_OTHER_PLACES.map(f => [f, [UB.navy25, UB.darkGrey]])),
+    relax: ['#C9DBFC' /* Medium Blue 25% */, '#5D92F5' /* Medium Blue 75% */],
+    checkin: ['#DADCE8' /* Dark Blue 15% */, UB.navy50],
     security: [UA.mediumRed, UA.darkBurgundy],
     inactive: [UB.lightGrey75, UB.mediumGrey], unoccupied: [UB.lightGrey75, UB.mediumGrey],
   },
