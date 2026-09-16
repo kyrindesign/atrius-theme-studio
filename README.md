@@ -18,7 +18,7 @@ A browser tool for designing the look of our Atrius (LocusLabs) indoor maps. A l
 - **Apply:** edits wait for **Apply changes** unless *Apply changes automatically* is on.
 - **Export:** *UI config* is a paste-ready `LMInit.newMap` config. *Map colors* is JSON for the Atrius team, with either just your changes or the whole edited venue file.
 - **Import:** paste a UI config or a map-colors JSON back in.
-- **Fix SDK text contrast** (on by default): some SDK text ignores the theme and is hard-coded `#333333`/`#666666`/`#000000`: place-card descriptions, website and phone links, map menu items, and flight-status error text. On dark panels that fails contrast. The studio previews a small host-page CSS rule that points these elements at the theme's own colors. Copy it from **Export → Host CSS** into the page that embeds the map; the map renders in that page, so the rule applies in production.
+- **Fix SDK text contrast** (on by default): some SDK text ignores the theme and is hard-coded `#333333`/`#666666`/`#000000`: place-card descriptions, website and phone links, map menu items, and flight-status error text. On dark panels that fails contrast. It also repoints the place-card tag chips, which the SDK paints with the primary *button* color even though they're 14px text, so a mid-tone button would leave them below AA. The studio previews a small host-page CSS rule that points these elements at the theme's own colors. Copy it from **Export → Host CSS** into the page that embeds the map; the map renders in that page, so the rule applies in production.
 
 ## Sharing designs
 
