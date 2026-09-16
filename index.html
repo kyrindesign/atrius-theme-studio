@@ -517,9 +517,13 @@ const FLIGHTAWARE = {
     focusOutlineColor: FA.concourseTag, modHeaderBackground: FA.road, modHeaderText: FA.white,
     myLocationPrimaryButton: FA.shopBadge, myLocationPrimaryButtonHover: FA.restaurantBadge,
     miscBadgePinColor: FA.concourseTag, miscBadgePinStroke: FA.restaurantBadge,
+    // Badges stay dark so their white glyphs keep working (the SDK's own default for all of these
+    // is a dark grey). The grey fallback for unnamed categories becomes a blue-grey.
     ...faBadges({ Eat: FA.restaurantBadge, Shop: FA.shopBadge, Restroom: FA.restroomBadge, Gate: FA.gateLabel,
       DynamicLabel: FA.concourseTag,
-      Relax: FA.concourse, Checkin: FA.tarmac /* Airlines */ }, FA.utilityBadge),
+      Relax: FA.concourse, Checkin: FA.tarmac /* Airlines */,
+      Services: '#0E3A46', Baggage: '#00558E', Ticketing: '#2E3180', Transport: '#0B3A4B',
+      Parking: '#0B2A4A', Art: '#3A3C86', Hotel: '#23305F' }, '#2F4A6B'),
   },
   dark: {
     primary: '#8CC4FF',
@@ -538,7 +542,9 @@ const FLIGHTAWARE = {
     miscBadgePinColor: '#4DA3FF', miscBadgePinStroke: FA.concourseTag,
     ...faBadges({ Eat: '#1F5FA8', Shop: FA.shopBadge, Restroom: '#2A4F80', Gate: FA.gateLabel,
       DynamicLabel: FA.concourseTag,
-      Relax: FA.darkShop, Checkin: FA.curb /* Airlines */ }, '#6B7480'),
+      Relax: FA.darkShop, Checkin: FA.curb /* Airlines */,
+      Services: '#0B2F39', Baggage: '#0B3F66', Ticketing: '#262A6B', Transport: '#082B38',
+      Parking: '#071F36', Art: '#32356F', Hotel: '#1E2A55' }, '#26405C'),
   },
   // Venue map fills: [light fillColor, dark darkFillColor]. Security, inactive and unoccupied keep defaults.
   places: {
@@ -550,11 +556,32 @@ const FLIGHTAWARE = {
     'element.wall': [FA.wall, FA.darkWall], 'element.opentobelow': [FA.tarmac, FA.darkTarmac],
     'element.nonaccessible': [FA.wall, FA.darkWall],
     eat: [FA.restaurant, FA.darkRestaurant], shop: [FA.shop, FA.darkShop],
-    ...Object.fromEntries(FA_OTHER_PLACES.map(f => [f, [FA.other, FA.darkOther]])),
+    // Every family gets its own blue instead of the SDK grey. Restrooms use the navy already
+    // defined for their badge, and parking its own dark blue out on the apron. Shades are spaced
+    // by CIELAB distance so families that sit next to each other stay tellable apart, and each
+    // one keeps enough distance from the floor, walls, outdoor ground and roads underneath it.
     relax: ['#8FB3DC', '#4F82B8'], checkin: ['#A3B7D1', '#6E8BB3'],
+    restroom: ['#002348', '#0E2C52'],
+    services: ['#4E8F9E', '#3E8092'],   // elevators, escalators, utilities — teal blue
+    gate: ['#3E82C9', '#3C72B4'],
+    ticketing: ['#8A92D8', '#7175BC'],  // indigo
+    baggage: ['#6FB4DA', '#569CC4'],
+    transport: ['#5E97B5', '#5089A8'],
+    parking: ['#17375F', '#1C3A5A'],
+    art: ['#A3A4D8', '#8788C0'],
+    hotel: ['#7A86B8', '#67759C'],
+    // Circulation footprints — the elevator, escalator and stairs boxes. These are element.* keys,
+    // not place families, so the studio has no row for them and they came straight out of the
+    // venue file grey (#999999 light, #8A99BD dark). They're small boxes on the concourse floor
+    // carrying their own icons, so they share one blue instead of taking a shade each.
+    'element.elevatorfootprint': ['#3A6389', '#24547A'],
+    'element.escalatorfootprint': ['#3A6389', '#24547A'],
+    'element.stairsfootprint': ['#3A6389', '#24547A'],
+    'element.rampfootprint': ['#3A6389', '#24547A'],
+    'element.portalfootprint': ['#3A6389', '#24547A'],
   },
   // Place, map and terminal labels: white text with a navy halo in both modes.
-  labels: Object.fromEntries(['eat', 'shop', 'security', ...FA_OTHER_PLACES, 'label', 'dynamicLabel']
+  labels: Object.fromEntries(['eat', 'shop', 'security', 'hotel', ...FA_OTHER_PLACES, 'label', 'dynamicLabel']
     .map(f => [f, { textColor: FA.white, haloColor: FA.road, darkTextColor: FA.white, darkHaloColor: FA.darkHalo }])),
   labelsAll: { textColor: FA.white, haloColor: FA.road, darkTextColor: FA.white, darkHaloColor: FA.darkHalo },
   // POI-dot label paint is hard-coded in Atrius's map style: previewed here, exported for Atrius.
