@@ -494,7 +494,9 @@ const FLIGHTAWARE = {
   light: {
     // primary = flight-toggle text on a 10% text tint; primaryButton at 85% backs white counter text.
     primary: FA.restaurantBadge, primaryButton: FA.restaurantBadge, primaryButtonText: FA.white, primaryButtonHover: FA.restroomBadge,
-    secondary: FA.road, secondaryButton: '#E6F1FD', secondaryButtonText: FA.restaurantBadge, secondaryButtonHover: '#CCE3FB',
+    // Buttons follow the Figma button set (261:2876): solid brand fill with a white label,
+    // secondary as a white button with a brand-blue label, in FlightAware's navies.
+    secondary: FA.road, secondaryButton: FA.white, secondaryButtonText: FA.restaurantBadge, secondaryButtonHover: '#E6F1FD',
     primaryText: FA.road, secondaryText: '#4B5E78', background: FA.white,
     toolTipBackground: FA.road, toolTipText: FA.white,
     mapNavBackground: FA.road, mapNavText: FA.white, mapNavSearchResults: FA.shopBadge, mapNavSearchResultsText: FA.white,
@@ -510,7 +512,8 @@ const FLIGHTAWARE = {
   dark: {
     // primaryButton doubles as tag-chip text on the panel, so dark mode uses a light button with dark text.
     primary: '#8CC4FF', primaryButton: '#4DA3FF', primaryButtonText: '#0B1A2E', primaryButtonHover: '#8CC4FF',
-    secondary: '#C9D6E6', secondaryButton: '#1B3558', secondaryButtonText: '#8CC4FF', secondaryButtonHover: '#24426B',
+    // Secondary in dark mode is the outlined button from the reference: white label on the panel tone.
+    secondary: '#C9D6E6', secondaryButton: '#1B3558', secondaryButtonText: FA.white, secondaryButtonHover: '#24426B',
     primaryText: '#E8EEF6', secondaryText: '#A9B8CC', background: '#0B1A2E',
     toolTipBackground: '#E8EEF6', toolTipText: '#0B1A2E',
     // The building/level selector draws dark text on mapNavBackground, so dark mode uses a light nav.
@@ -602,7 +605,7 @@ const UA = {
 const UNITED_BLUE = {
   light: {
     primary: UB.unitedBlue, primaryButton: UB.unitedBlue, primaryButtonText: UB.white, primaryButtonHover: UB.unitedBlue35Black,
-    secondary: UB.darkBlue, secondaryButton: UB.blue15, secondaryButtonText: UB.unitedBlue, secondaryButtonHover: UB.blue25,
+    secondary: UB.darkBlue, secondaryButton: UB.white, secondaryButtonText: UB.unitedBlue, secondaryButtonHover: UA.tonalGrey50,
     primaryText: UB.darkGrey, secondaryText: UB.mediumGrey, background: UB.white,
     toolTipBackground: UB.darkBlue, toolTipText: UB.white,
     mapNavBackground: UB.darkBlue, mapNavText: UB.white, mapNavSearchResults: UB.unitedBlue, mapNavSearchResultsText: UB.white,
@@ -639,8 +642,13 @@ const UNITED_BLUE = {
   },
   dark: {
     // primaryButton doubles as tag-chip text on the panel: light button, dark text.
-    primary: UB.blue50, primaryButton: UB.blue50, primaryButtonText: UB.megaDarkGrey, primaryButtonHover: UB.blue25,
-    secondary: UB.vengeanceGrey, secondaryButton: UB.darkGrey, secondaryButtonText: UB.blue50, secondaryButtonHover: UB.darkBlue,
+    // Buttons from the Figma button set (261:2876). It draws the dark button Medium Blue with a
+    // white label and Medium Blue 50% with a black label on hover; the SDK has one label color for
+    // both states and also paints primaryButton as tag-chip text on the panel, where Medium Blue is
+    // only 4.09:1. So the two reference fills swap roles: Blue 50% at rest (9.25:1 as chip text),
+    // Medium Blue on hover, both with the reference's black label (10.37:1 / 4.59:1).
+    primary: UB.blue50, primaryButton: UB.blue50, primaryButtonText: UA.black, primaryButtonHover: UB.mediumBlue,
+    secondary: UB.vengeanceGrey, secondaryButton: UB.darkGrey, secondaryButtonText: UB.white, secondaryButtonHover: UB.navy75,
     primaryText: UB.vengeanceGrey, secondaryText: UB.lightGrey75, background: UB.megaDarkGrey,
     toolTipBackground: UB.vengeanceGrey, toolTipText: UB.megaDarkGrey,
     // The building/level selector draws dark text on mapNavBackground, so dark mode uses a light nav.
